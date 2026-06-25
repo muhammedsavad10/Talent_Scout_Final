@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-sm p-6;
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-900 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-all;
+  }
+}
