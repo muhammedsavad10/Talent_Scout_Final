@@ -20,10 +20,14 @@ class Settings(BaseSettings):
     # Vector Database (Qdrant)
     QDRANT_URL: str
     QDRANT_API_KEY: str
+    
+    # Development Flags
+    DEVELOPMENT_MODE: bool = False
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"
 
 # Initialize settings
 try:
@@ -39,3 +43,17 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("talentscout_core")
+
+# Telemetry and LLM stubs for ingestion.py compatibility
+def add_timing(func):
+    import functools
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+def call_llm(*args, **kwargs):
+    pass
+
+def record_llm_call(*args, **kwargs):
+    pass
