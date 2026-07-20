@@ -10,12 +10,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app.agents.orchestrator import run_evaluation_pipeline
 
 RESUMES = {
-    "ideal": "This is an IDEAL candidate resume text. Contact candidate@example.com.",
-    "missing_mandatory": "This is a MISSING_MANDATORY candidate text.",
-    "junior": "This is a JUNIOR candidate.",
-    "duplicate": "This DUPLICATE candidate text has Python python and PYTHON.",
-    "malformed": "MALFORMED resume binary data.",
-    "strong_missing_preferred": "I am a strong candidate with Django but missing preferred."
+    "ideal": "Name: Ideal Candidate\nI am a highly skilled engineer with 8 years of experience. My expertise includes Python, JavaScript, FastAPI, React, and Docker. Education: B.S. Computer Science.",
+    "missing_mandatory": "Name: Missing Mandatory\nExperienced developer with 5 years of experience building enterprise systems using Java and Spring. Education: B.S. Computer Science.",
+    "junior": "Name: Junior Candidate\nRecent graduate looking for a junior backend role. I have 2 years of experience working on university projects using Python. Education: B.S. Computer Science.",
+    "duplicate": "Name: Duplicate Candidate\nI know Python python and PYTHON. I also know fast-api and FastAPI. I have 4 years of experience.",
+    "malformed": "",
+    "strong_missing_preferred": "Name: Strong Default\nStrong engineer with 6 years of experience in backend development. Skilled in Python and Django. Education: B.S. Computer Science."
 }
 REQUIRED_SKILLS = ["Python", "FastAPI"]
 

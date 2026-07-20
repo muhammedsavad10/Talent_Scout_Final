@@ -1,55 +1,50 @@
 """
-Temporary reconstruction stub.
-
-Reconstructed after Phase 5 data loss.
-Provides storage layer stubs for evaluations and batch tracking.
-Full logic will be implemented in later reconstruction phases.
+Reconstructed Evaluation Store for Phase C4B.
+Uses an in-memory dictionary fallback to ensure end-to-end flow works
+without requiring a live Supabase connection during reconstruction testing.
 """
 import logging
 from typing import Dict, Any, Optional
-from app.db.clients import supabase_db
 
 logger = logging.getLogger(__name__)
 
 class EvaluationStore:
     def __init__(self):
-        self.db = supabase_db
+        self._evaluations: Dict[str, Dict[str, Any]] = {}
+        self._batches: Dict[str, Dict[str, Any]] = {}
         
     async def save_evaluation(self, evaluation_id: str, data: Dict[str, Any]) -> bool:
-        """
-        Stub for saving an individual evaluation.
-        Assumption: Saves to a Supabase 'evaluations' table.
-        """
-        logger.info(f"Stub save_evaluation for {evaluation_id}")
+        self._evaluations[evaluation_id] = data
+        logger.info(f"Saved evaluation {evaluation_id} to in-memory store.")
         return True
         
     async def get_evaluation(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Stub for fetching an individual evaluation.
-        """
-        logger.info(f"Stub get_evaluation for {evaluation_id}")
-        return None
+        return self._evaluations.get(evaluation_id)
 
     async def create_batch(self, batch_id: str, total: int) -> bool:
-        """
-        Stub for creating a batch evaluation tracking record.
-        """
-        logger.info(f"Stub create_batch for {batch_id}")
+        self._batches[batch_id] = {
+            "batch_id": batch_id,
+            "status": "PROCESSING",
+            "total": total,
+            "completed": 0,
+            "processing": total,
+            "queued": 0,
+            "failed": 0,
+            "successfully_evaluated": 0,
+            "results": {"ranked_candidates": []},
+            "raw_evaluations": []
+        }
+        logger.info(f"Created batch {batch_id} in memory.")
         return True
 
     async def update_batch_status(self, batch_id: str, status_data: Dict[str, Any]) -> bool:
-        """
-        Stub for updating batch status.
-        """
-        logger.info(f"Stub update_batch_status for {batch_id}")
-        return True
+        if batch_id in self._batches:
+            self._batches[batch_id].update(status_data)
+            return True
+        return False
         
     async def get_batch_status(self, batch_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Stub for fetching batch status.
-        """
-        logger.info(f"Stub get_batch_status for {batch_id}")
-        return None
+        return self._batches.get(batch_id)
 
 # Singleton instance
 evaluation_store = EvaluationStore()

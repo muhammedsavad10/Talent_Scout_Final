@@ -45,12 +45,8 @@ logging.basicConfig(
 logger = logging.getLogger("talentscout_core")
 
 # Telemetry and LLM stubs for ingestion.py compatibility
-def add_timing(func):
-    import functools
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
+def add_timing(*args, **kwargs):
+    pass
 
 def call_llm(*args, **kwargs):
     pass

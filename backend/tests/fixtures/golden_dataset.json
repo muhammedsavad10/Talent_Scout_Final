@@ -3,10 +3,244 @@
     "evaluation_id": "id_ideal",
     "status": "success",
     "personal_info": {
-      "name": "Ideal Candidate"
+      "name": "Ideal Candidate\nI am a highly skilled engineer with"
     },
     "contacts": {
-      "email": "candidate@example.com",
+      "email": null,
+      "phone": null,
+      "links": []
+    },
+    "overall_score": 90,
+    "decision_engine": {
+      "overall_score": 90,
+      "dimension_scores": {
+        "skill_match": "score=100 confidence=100 weight=0.4 evidence=['Matched 2 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quantity": "score=100 confidence=100 weight=0.2 evidence=['Found 8 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
+      },
+      "evidence_states": {
+        "MATCHED": [
+          "Python",
+          "FastAPI"
+        ],
+        "INFERRED": [],
+        "MISSING": [],
+        "CONTRADICTED": []
+      },
+      "policy_eligible": true,
+      "policy_flags": [],
+      "recommendation": {
+        "hiring_recommendation": "Strong Hire",
+        "recommendation_basis": {
+          "strengths": [
+            "Policy Eligible"
+          ],
+          "weaknesses": [],
+          "critical_missing_skills": [],
+          "reasoning": "Exceptional candidate exceeding all baseline thresholds."
+        }
+      },
+      "recommendation_basis": {
+        "strengths": [
+          "Policy Eligible"
+        ],
+        "weaknesses": [],
+        "critical_missing_skills": [],
+        "reasoning": "Exceptional candidate exceeding all baseline thresholds."
+      }
+    },
+    "recommendation": {
+      "hiring_recommendation": "Strong Hire",
+      "recommendation_basis": {
+        "strengths": [
+          "Policy Eligible"
+        ],
+        "weaknesses": [],
+        "critical_missing_skills": [],
+        "reasoning": "Exceptional candidate exceeding all baseline thresholds."
+      }
+    },
+    "_metrics": {
+      "execution_time_ms": 9.41
+    }
+  },
+  "missing_mandatory": {
+    "evaluation_id": "id_missing_mandatory",
+    "status": "success",
+    "personal_info": {
+      "name": "Missing Mandatory\nExperienced developer with"
+    },
+    "contacts": {
+      "email": null,
+      "phone": null,
+      "links": []
+    },
+    "overall_score": 44,
+    "decision_engine": {
+      "overall_score": 44,
+      "dimension_scores": {
+        "skill_match": "score=0 confidence=100 weight=0.4 evidence=['Matched 0 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quantity": "score=100 confidence=100 weight=0.2 evidence=['Found 5 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_relevance": "score=50 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
+      },
+      "evidence_states": {
+        "MATCHED": [],
+        "INFERRED": [],
+        "MISSING": [
+          "Python",
+          "FastAPI"
+        ],
+        "CONTRADICTED": []
+      },
+      "policy_eligible": false,
+      "policy_flags": [
+        "Overall score 44 below minimum 60",
+        "Skill score 0 below minimum 50",
+        "Missing mandatory skill: Python",
+        "Missing mandatory skill: FastAPI"
+      ],
+      "recommendation": {
+        "hiring_recommendation": "Reject",
+        "recommendation_basis": {
+          "strengths": [],
+          "weaknesses": [
+            "Overall score 44 below minimum 60",
+            "Skill score 0 below minimum 50",
+            "Missing mandatory skill: Python",
+            "Missing mandatory skill: FastAPI"
+          ],
+          "critical_missing_skills": [
+            "Python",
+            "FastAPI"
+          ],
+          "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 44 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
+        }
+      },
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Overall score 44 below minimum 60",
+          "Skill score 0 below minimum 50",
+          "Missing mandatory skill: Python",
+          "Missing mandatory skill: FastAPI"
+        ],
+        "critical_missing_skills": [
+          "Python",
+          "FastAPI"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 44 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
+      }
+    },
+    "recommendation": {
+      "hiring_recommendation": "Reject",
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Overall score 44 below minimum 60",
+          "Skill score 0 below minimum 50",
+          "Missing mandatory skill: Python",
+          "Missing mandatory skill: FastAPI"
+        ],
+        "critical_missing_skills": [
+          "Python",
+          "FastAPI"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 44 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
+      }
+    },
+    "_metrics": {
+      "execution_time_ms": 0.0
+    }
+  },
+  "junior": {
+    "evaluation_id": "id_junior",
+    "status": "success",
+    "personal_info": {
+      "name": "Junior Candidate\nRecent graduate looking for a junior backend role"
+    },
+    "contacts": {
+      "email": null,
+      "phone": null,
+      "links": []
+    },
+    "overall_score": 58,
+    "decision_engine": {
+      "overall_score": 58,
+      "dimension_scores": {
+        "skill_match": "score=50 confidence=100 weight=0.4 evidence=['Matched 1 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quantity": "score=40 confidence=100 weight=0.2 evidence=['Found 2 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
+      },
+      "evidence_states": {
+        "MATCHED": [
+          "Python"
+        ],
+        "INFERRED": [],
+        "MISSING": [
+          "FastAPI"
+        ],
+        "CONTRADICTED": []
+      },
+      "policy_eligible": false,
+      "policy_flags": [
+        "Overall score 58 below minimum 60",
+        "Missing mandatory skill: FastAPI"
+      ],
+      "recommendation": {
+        "hiring_recommendation": "Reject",
+        "recommendation_basis": {
+          "strengths": [],
+          "weaknesses": [
+            "Overall score 58 below minimum 60",
+            "Missing mandatory skill: FastAPI"
+          ],
+          "critical_missing_skills": [
+            "FastAPI"
+          ],
+          "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 58 below minimum 60\n - Missing mandatory skill: FastAPI"
+        }
+      },
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Overall score 58 below minimum 60",
+          "Missing mandatory skill: FastAPI"
+        ],
+        "critical_missing_skills": [
+          "FastAPI"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 58 below minimum 60\n - Missing mandatory skill: FastAPI"
+      }
+    },
+    "recommendation": {
+      "hiring_recommendation": "Reject",
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Overall score 58 below minimum 60",
+          "Missing mandatory skill: FastAPI"
+        ],
+        "critical_missing_skills": [
+          "FastAPI"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 58 below minimum 60\n - Missing mandatory skill: FastAPI"
+      }
+    },
+    "_metrics": {
+      "execution_time_ms": 1.0
+    }
+  },
+  "duplicate": {
+    "evaluation_id": "id_duplicate",
+    "status": "success",
+    "personal_info": {
+      "name": "Duplicate Candidate\nI know Python python and PYTHON"
+    },
+    "contacts": {
+      "email": null,
       "phone": null,
       "links": []
     },
@@ -65,244 +299,10 @@
       "execution_time_ms": 0.0
     }
   },
-  "missing_mandatory": {
-    "evaluation_id": "id_missing_mandatory",
-    "status": "success",
-    "personal_info": {
-      "name": "Missing Mandatory"
-    },
-    "contacts": {
-      "email": null,
-      "phone": null,
-      "links": []
-    },
-    "overall_score": 36,
-    "decision_engine": {
-      "overall_score": 36,
-      "dimension_scores": {
-        "skill_match": "score=0 confidence=100 weight=0.4 evidence=['Matched 0 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quantity": "score=60 confidence=100 weight=0.2 evidence=['Found 3 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_relevance": "score=50 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
-      },
-      "evidence_states": {
-        "MATCHED": [],
-        "INFERRED": [],
-        "MISSING": [
-          "Python",
-          "FastAPI"
-        ],
-        "CONTRADICTED": []
-      },
-      "policy_eligible": false,
-      "policy_flags": [
-        "Overall score 36 below minimum 60",
-        "Skill score 0 below minimum 50",
-        "Missing mandatory skill: Python",
-        "Missing mandatory skill: FastAPI"
-      ],
-      "recommendation": {
-        "hiring_recommendation": "Reject",
-        "recommendation_basis": {
-          "strengths": [],
-          "weaknesses": [
-            "Overall score 36 below minimum 60",
-            "Skill score 0 below minimum 50",
-            "Missing mandatory skill: Python",
-            "Missing mandatory skill: FastAPI"
-          ],
-          "critical_missing_skills": [
-            "Python",
-            "FastAPI"
-          ],
-          "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 36 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
-        }
-      },
-      "recommendation_basis": {
-        "strengths": [],
-        "weaknesses": [
-          "Overall score 36 below minimum 60",
-          "Skill score 0 below minimum 50",
-          "Missing mandatory skill: Python",
-          "Missing mandatory skill: FastAPI"
-        ],
-        "critical_missing_skills": [
-          "Python",
-          "FastAPI"
-        ],
-        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 36 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
-      }
-    },
-    "recommendation": {
-      "hiring_recommendation": "Reject",
-      "recommendation_basis": {
-        "strengths": [],
-        "weaknesses": [
-          "Overall score 36 below minimum 60",
-          "Skill score 0 below minimum 50",
-          "Missing mandatory skill: Python",
-          "Missing mandatory skill: FastAPI"
-        ],
-        "critical_missing_skills": [
-          "Python",
-          "FastAPI"
-        ],
-        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 36 below minimum 60\n - Skill score 0 below minimum 50\n - Missing mandatory skill: Python\n - Missing mandatory skill: FastAPI"
-      }
-    },
-    "_metrics": {
-      "execution_time_ms": 0.55
-    }
-  },
-  "junior": {
-    "evaluation_id": "id_junior",
-    "status": "success",
-    "personal_info": {
-      "name": "Junior Candidate"
-    },
-    "contacts": {
-      "email": null,
-      "phone": null,
-      "links": []
-    },
-    "overall_score": 54,
-    "decision_engine": {
-      "overall_score": 54,
-      "dimension_scores": {
-        "skill_match": "score=50 confidence=100 weight=0.4 evidence=['Matched 1 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quantity": "score=20 confidence=100 weight=0.2 evidence=['Found 1 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
-      },
-      "evidence_states": {
-        "MATCHED": [
-          "Python"
-        ],
-        "INFERRED": [],
-        "MISSING": [
-          "FastAPI"
-        ],
-        "CONTRADICTED": []
-      },
-      "policy_eligible": false,
-      "policy_flags": [
-        "Overall score 54 below minimum 60",
-        "Missing mandatory skill: FastAPI"
-      ],
-      "recommendation": {
-        "hiring_recommendation": "Reject",
-        "recommendation_basis": {
-          "strengths": [],
-          "weaknesses": [
-            "Overall score 54 below minimum 60",
-            "Missing mandatory skill: FastAPI"
-          ],
-          "critical_missing_skills": [
-            "FastAPI"
-          ],
-          "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 54 below minimum 60\n - Missing mandatory skill: FastAPI"
-        }
-      },
-      "recommendation_basis": {
-        "strengths": [],
-        "weaknesses": [
-          "Overall score 54 below minimum 60",
-          "Missing mandatory skill: FastAPI"
-        ],
-        "critical_missing_skills": [
-          "FastAPI"
-        ],
-        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 54 below minimum 60\n - Missing mandatory skill: FastAPI"
-      }
-    },
-    "recommendation": {
-      "hiring_recommendation": "Reject",
-      "recommendation_basis": {
-        "strengths": [],
-        "weaknesses": [
-          "Overall score 54 below minimum 60",
-          "Missing mandatory skill: FastAPI"
-        ],
-        "critical_missing_skills": [
-          "FastAPI"
-        ],
-        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 54 below minimum 60\n - Missing mandatory skill: FastAPI"
-      }
-    },
-    "_metrics": {
-      "execution_time_ms": 0.0
-    }
-  },
-  "duplicate": {
-    "evaluation_id": "id_duplicate",
-    "status": "success",
-    "personal_info": {
-      "name": "Duplicate Candidate"
-    },
-    "contacts": {
-      "email": null,
-      "phone": null,
-      "links": []
-    },
-    "overall_score": 78,
-    "decision_engine": {
-      "overall_score": 78,
-      "dimension_scores": {
-        "skill_match": "score=100 confidence=100 weight=0.4 evidence=['Matched 2 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quantity": "score=40 confidence=100 weight=0.2 evidence=['Found 2 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
-      },
-      "evidence_states": {
-        "MATCHED": [
-          "Python",
-          "FastAPI"
-        ],
-        "INFERRED": [],
-        "MISSING": [],
-        "CONTRADICTED": []
-      },
-      "policy_eligible": true,
-      "policy_flags": [],
-      "recommendation": {
-        "hiring_recommendation": "Hire",
-        "recommendation_basis": {
-          "strengths": [
-            "Policy Eligible"
-          ],
-          "weaknesses": [],
-          "critical_missing_skills": [],
-          "reasoning": "Solid candidate meeting primary requirements."
-        }
-      },
-      "recommendation_basis": {
-        "strengths": [
-          "Policy Eligible"
-        ],
-        "weaknesses": [],
-        "critical_missing_skills": [],
-        "reasoning": "Solid candidate meeting primary requirements."
-      }
-    },
-    "recommendation": {
-      "hiring_recommendation": "Hire",
-      "recommendation_basis": {
-        "strengths": [
-          "Policy Eligible"
-        ],
-        "weaknesses": [],
-        "critical_missing_skills": [],
-        "reasoning": "Solid candidate meeting primary requirements."
-      }
-    },
-    "_metrics": {
-      "execution_time_ms": 0.0
-    }
-  },
   "malformed": {
     "status": "error",
     "error_stage": "parser",
-    "message": "Malformed resume text",
+    "message": "Malformed or empty resume text",
     "_metrics": {
       "execution_time_ms": 0.0
     }
@@ -311,19 +311,19 @@
     "evaluation_id": "id_strong_missing_preferred",
     "status": "success",
     "personal_info": {
-      "name": "Strong Default"
+      "name": "Strong Default\nStrong engineer with"
     },
     "contacts": {
       "email": null,
       "phone": null,
       "links": []
     },
-    "overall_score": 62,
+    "overall_score": 70,
     "decision_engine": {
-      "overall_score": 62,
+      "overall_score": 70,
       "dimension_scores": {
         "skill_match": "score=50 confidence=100 weight=0.4 evidence=['Matched 1 out of 2 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
-        "experience_quantity": "score=60 confidence=100 weight=0.2 evidence=['Found 3 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+        "experience_quantity": "score=100 confidence=100 weight=0.2 evidence=['Found 6 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
         "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
         "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
       },

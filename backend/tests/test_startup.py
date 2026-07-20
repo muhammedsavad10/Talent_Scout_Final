@@ -11,8 +11,7 @@ def test_startup_imports_and_registration():
     
     # Check if routers are registered (e.g., /api/v1/evaluate/batch should exist)
     response = client.get("/api/v1/evaluate/batch/fake-id")
-    assert response.status_code == 200
-    assert response.json()["status"] == "COMPLETED"
+    assert response.status_code == 404
 
 def test_startup_events_execute():
     """

@@ -1,0 +1,23 @@
+============================= test session starts =============================
+platform win32 -- Python 3.10.10, pytest-9.1.0, pluggy-1.6.0 -- C:\Users\Muhammed Savad T M\Desktop\Brototype\FINAL PROJECT\talent_scout_enterprise\backend\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Muhammed Savad T M\Desktop\Brototype\FINAL PROJECT\talent_scout_enterprise\backend
+plugins: anyio-4.14.0, langsmith-0.9.2, asyncio-1.4.0, mock-3.15.1
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 13 items
+
+tests/test_scorer.py::test_scorer_perfect_candidate PASSED               [  7%]
+tests/test_scorer.py::test_scorer_partial_match PASSED                   [ 15%]
+tests/test_scorer.py::test_scorer_zero_match PASSED                      [ 23%]
+tests/test_scorer.py::test_scorer_missing_optional_skills PASSED         [ 30%]
+tests/test_scorer.py::test_scorer_duplicate_skills PASSED                [ 38%]
+tests/test_scorer.py::test_scorer_contradictory_evidence PASSED          [ 46%]
+tests/test_comparator.py::test_comparator_one_candidate PASSED           [ 53%]
+tests/test_comparator.py::test_comparator_two_candidates PASSED          [ 61%]
+tests/test_comparator.py::test_comparator_equal_scores PASSED            [ 69%]
+tests/test_comparator.py::test_comparator_failed_candidate PASSED        [ 76%]
+tests/test_comparator.py::test_comparator_missing_dimensions PASSED      [ 84%]
+tests/test_comparator.py::test_comparator_legacy_dictionary_input PASSED [ 92%]
+tests/test_comparator.py::test_comparator_reconstructed_model_input PASSED [100%]
+
+============================= 13 passed in 0.16s ==============================

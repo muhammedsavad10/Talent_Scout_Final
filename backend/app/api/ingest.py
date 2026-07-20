@@ -16,13 +16,21 @@ async def upload_resume(file: UploadFile = File(...)):
     Endpoint to upload a PDF resume, extract text, parse to JSON, 
     and SAVE to PostgreSQL (CRUD: Create).
     """
-    if not file.filename.endswith(".pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
     try:
         file_bytes = await file.read()
         
-        # 1. Extract & Parse
+        # 1a. Security Hardening: File size check (Max 5MB)
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File size exceeds the 5MB limit.")
+            
+        # 1b. Security Hardening: Magic Bytes validation for PDF
+        if not file_bytes.startswith(b"%PDF"):
+            raise HTTPException(status_code=415, detail="Invalid file type. File is not a genuine PDF.")
+        
+        # 1c. Extract & Parse
         raw_text = extract_text_from_pdf(file_bytes)
         structured_data = parse_resume_to_json(raw_text)
         
@@ -49,6 +57,8 @@ async def upload_resume(file: UploadFile = File(...)):
             "parsed_data": structured_data
         }
         
+    except HTTPException as he:
+        raise he
     except ValueError as ve:
         raise HTTPException(status_code=422, detail=str(ve))
     except Exception as e:
