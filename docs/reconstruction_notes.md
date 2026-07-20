@@ -13,4 +13,9 @@
 *   **Parser Validation**: Schemas are rigorously mapped to the surviving `schemas.py::ParserValidationReport`. Validation logic applies basic deterministic existence checks for standard sections (education, experience, skills).
 
 ## Phase C2: Scoring & Comparator
-*(To be populated as work progresses)*
+*   **Dimensional Weights:** Hardcoded in `scorer.py` as `skill_match` (0.40), `experience_quantity` (0.20), `experience_relevance` (0.25), and `experience_quality` (0.15) due to missing `weights.yaml`.
+*   **Comparator Fallbacks:** Comparator was built to defensively extract fields using a `safe_get` helper so that both legacy dicts and pydantic models map to rankable Candidate rows.
+
+## Phase C3: Decision Layer
+*   **Policy Engine Config Missing:** Implemented a fallback `DEFAULT_POLICY_CONFIG` in `policy_engine.py` mimicking a hypothetical `hiring_policy.yaml`. It enforces minimum scores (overall >= 60, skill >= 50) and critical skill validation.
+*   **Strategy Tiers:** Hardcoded logic mapped to 5 tiers: Strong Hire, Hire, Interview, Hold, Reject based on Policy Engine boolean flags and Score bands.
