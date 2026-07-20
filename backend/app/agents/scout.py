@@ -48,3 +48,56 @@ def initialize_qdrant_collection():
     """
     logger.info("Reconstructed stub: initialize_qdrant_collection executed.")
     return True
+
+def parse_resume_stub(text: str) -> dict:
+    """
+    Simulates the LLM parsing layer since LLM logic is excluded from C4A.
+    Returns a structured dictionary representing the parsed resume based on keywords.
+    """
+    if "MALFORMED" in text:
+        return {"error": "Malformed resume text"}
+        
+    if "IDEAL" in text:
+        return {
+            "personal_info": {"name": "Ideal Candidate"},
+            "skills": {"languages": ["Python", "JavaScript"]},
+            "hard_skills": ["FastAPI", "React", "Docker"],
+            "work_history": [{}, {}, {}, {}], # 8 years
+            "education": [{"degree": "B.S. Computer Science"}]
+        }
+    
+    if "MISSING_MANDATORY" in text:
+        return {
+            "personal_info": {"name": "Missing Mandatory"},
+            "skills": {"languages": ["Java"]},
+            "hard_skills": ["Spring"],
+            "work_history": [{}, {}, {}],
+            "education": [{"degree": "B.S. Computer Science"}]
+        }
+        
+    if "JUNIOR" in text:
+        return {
+            "personal_info": {"name": "Junior Candidate"},
+            "skills": {"languages": ["Python"]},
+            "hard_skills": [],
+            "work_history": [{}], # 2 years
+            "education": [{"degree": "B.S. Computer Science"}]
+        }
+        
+    if "DUPLICATE" in text:
+        return {
+            "personal_info": {"name": "Duplicate Candidate"},
+            "skills": {"languages": ["Python", "PYTHON", "python"]},
+            "hard_skills": ["FastAPI", "fast-api"],
+            "work_history": [{}, {}],
+            "education": [{"degree": "B.S. Computer Science"}]
+        }
+        
+    # Default Strong candidate missing preferred
+    return {
+        "personal_info": {"name": "Strong Default"},
+        "skills": {"languages": ["Python"]},
+        "hard_skills": ["Django"],
+        "work_history": [{}, {}, {}],
+        "education": [{"degree": "B.S. Computer Science"}]
+    }

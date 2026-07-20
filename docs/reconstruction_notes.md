@@ -18,4 +18,7 @@
 
 ## Phase C3: Decision Layer
 *   **Policy Engine Config Missing:** Implemented a fallback `DEFAULT_POLICY_CONFIG` in `policy_engine.py` mimicking a hypothetical `hiring_policy.yaml`. It enforces minimum scores (overall >= 60, skill >= 50) and critical skill validation.
-*   **Strategy Tiers:** Hardcoded logic mapped to 5 tiers: Strong Hire, Hire, Interview, Hold, Reject based on Policy Engine boolean flags and Score bands.
+## Phase C4A: Orchestration Only
+*   **Orchestration Assumptions:** The `orchestrator.py` wires the internal evaluation pipeline deterministically (Parser -> Normalization -> Validation -> Extraction -> Scorer -> Policy -> Strategy).
+*   **Temporary Implementations:** The true AI parser is stubbed out inside `scout.py` via `parse_resume_stub(text)`. The stub returns variations based on hardcoded keywords (IDEAL, MISSING_MANDATORY, etc.) to allow pipeline verification without LLM calls. The `scout.py` service also uses a `DummyEmbeddingModel` by default unless `DEVELOPMENT_MODE=False`.
+*   **Deviations:** HTTP endpoints (FastAPI) and batch evaluation worker flows remain disconnected to ensure isolated orchestration testing.
