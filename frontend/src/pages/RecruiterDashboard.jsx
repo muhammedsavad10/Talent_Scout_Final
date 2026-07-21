@@ -6,6 +6,7 @@ import {
   Lock, Unlock, Clock, ArrowUpRight, BookOpen, Award, Check, Save, Edit2, Info, Activity
 } from 'lucide-react';
 import { mapEvaluationResponse } from '../services/evaluationMapper';
+import { getDimensionLabel } from '../utils/dimensionLabels';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -998,7 +999,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                       {result.dimensionScores.map(dim => (
                         <div key={dim.key} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm text-center space-y-1 hover:border-indigo-300 transition-colors cursor-default" title={dim.evidence?.join('\n')}>
-                          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block truncate">{dim.title}</span>
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block truncate">{getDimensionLabel(dim.key)}</span>
                           <span className="text-2xl sm:text-3xl font-black text-indigo-600 font-sans">
                             {dim.score}
                           </span>
