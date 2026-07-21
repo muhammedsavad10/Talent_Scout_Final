@@ -1,21 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, UploadCloud, Briefcase, FileText, CheckCircle, XCircle, AlertCircle, 
-  RefreshCw, ChevronRight, ChevronLeft, Mail, MessageSquare, Send, Terminal, 
-  Lock, Unlock, Clock, ArrowUpRight, BookOpen, Award, Check, Save, Edit2, Info, Activity
+  Users, UploadCloud, FileText, CheckCircle, XCircle, AlertCircle, 
+  RefreshCw, Mail, MessageSquare, Send, Terminal, 
+  ArrowUpRight, Save, Edit2
 } from 'lucide-react';
 import { mapEvaluationResponse } from '../services/evaluationMapper';
-import { getDimensionLabel } from '../utils/dimensionLabels';
 import { evaluationService } from '../services/evaluationService';
 import { batchService } from '../services/batchService';
-import { candidateService } from '../services/candidateService';
 import { chatService } from '../services/chatService';
+import { useEvaluation } from '../features/evaluation/context/EvaluationContext';
 import UploadWizard from '../features/batch/components/UploadWizard';
 import BatchProgress from '../features/batch/components/BatchProgress';
 import BatchCompleteCard from '../features/batch/components/BatchCompleteCard';
-import DimensionScorePanel from '../features/evaluation/components/DimensionScorePanel';
-import SkillAnalysisCard from '../features/evaluation/components/SkillAnalysisCard';
 import EvaluationWizard from '../features/evaluation/components/EvaluationWizard';
+import ComparisonFeature from '../features/comparison/ComparisonFeature';
 
 const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const { state, dispatch } = useEvaluation();
@@ -214,46 +212,6 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     }
   };
 
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    dispatch({ type: 'BATCH/SET_SORT_CONFIG', payload: { key, direction } });
-  };
-
-  const toggleCandidateSelection = (evalId) => {
-    dispatch({ type: 'BATCH/SELECT_CANDIDATE', payload: evalId });
-  };
-
-  const getSortedFilteredCandidates = () => {
-    if (!batchResult || !batchResult.ranked_candidates) return [];
-    
-    let filtered = [...batchResult.ranked_candidates];
-    
-    if (filterTier !== 'All') {
-      filtered = filtered.filter(c => c.recommendation_tier === filterTier);
-    }
-    
-    if (sortConfig.key !== 'rank') {
-      filtered.sort((a, b) => {
-        let aVal = a[sortConfig.key];
-        let bVal = b[sortConfig.key];
-        
-        if (sortConfig.key === 'policy_eligible') {
-          aVal = a.policy_eligible ? 1 : 0;
-          bVal = b.policy_eligible ? 1 : 0;
-        }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-    
-    return filtered;
-  };
-
   return (
     <div className="relative space-y-6">
       
@@ -300,197 +258,18 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                 <div className="space-y-6">
                   <UploadWizard />
                   <BatchProgress />
-                  <BatchCompleteCard onViewComparison={() => dispatch({ type: 'SET_STEP', payload: 1.5 })} />
+                  <BatchCompleteCard onViewComparison={() => dispatch({ type: 'INGEST/SET_STEP', payload: 1.5 })} />
                 </div>
               )}
 
               {/* STEP 1.5: CANDIDATE COMPARISON */}
               {displayStep === 1.5 && batchResult && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-800 font-sans">Candidate Comparison</h2>
-                    <div className="flex space-x-3">
-                      <select 
-                        value={filterTier}
-                        onChange={(e) => dispatch({ type: 'SET_FILTER_TIER', payload: e.target.value })}
-                        className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="All">All Tiers</option>
-                        <option value="Recommended">Recommended</option>
-                        <option value="Review Before Interview">Review</option>
-                        <option value="Keep as Backup">Backup</option>
-                        <option value="Not Suitable for this Role">Not Suitable</option>
-                      </select>
-                      
-                      <button 
-                        onClick={() => dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: true })}
-                        disabled={selectedCandidates.length < 2 || selectedCandidates.length > 4}
-                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-bold rounded-lg transition"
-                      >
-                        Compare Selected ({selectedCandidates.length})
-                      </button>
-                    </div>
-                  </div>
+                <ComparisonFeature onViewResult={handleViewResult} />
+              )}
 
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="p-4"><input type="checkbox" disabled className="rounded text-indigo-600" /></th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('rank')}>
-                              Rank {sortConfig.key === 'rank' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('filename')}>
-                              Candidate {sortConfig.key === 'filename' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('recommendation_tier')}>
-                              Policy Tier {sortConfig.key === 'recommendation_tier' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('policy_eligible')}>
-                              Eligibility {sortConfig.key === 'policy_eligible' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('overall_score')}>
-                              Score {sortConfig.key === 'overall_score' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase cursor-pointer" onClick={() => handleSort('skill_match')}>
-                              Skill Match {sortConfig.key === 'skill_match' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase">Missing Critical</th>
-                            <th className="p-4 text-xs font-bold text-slate-500 uppercase">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {getSortedFilteredCandidates().map(cand => (
-                            <tr key={cand.evaluation_id} className={`hover:bg-slate-50 transition ${!cand.policy_eligible ? 'bg-slate-50/50' : ''}`}>
-                              <td className="p-4">
-                                <input 
-                                  type="checkbox" 
-                                  checked={selectedCandidates.includes(cand.evaluation_id)}
-                                  onChange={() => toggleCandidateSelection(cand.evaluation_id)}
-                                  disabled={!selectedCandidates.includes(cand.evaluation_id) && selectedCandidates.length >= 4}
-                                  className="rounded text-indigo-600 focus:ring-indigo-500"
-                                />
-                              </td>
-                              <td className="p-4">
-                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${cand.rank === 1 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
-                                  {cand.rank}
-                                </span>
-                              </td>
-                              <td className="p-4 font-bold text-slate-800 text-sm">{cand.filename.replace('.pdf', '')}</td>
-                              <td className="p-4">
-                                <span className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-md border ${getRecommendationStyle(cand.recommendation_tier).bg} ${getRecommendationStyle(cand.recommendation_tier).text}`}>
-                                  {cand.recommendation_tier}
-                                </span>
-                              </td>
-                              <td className="p-4">
-                                {cand.policy_eligible ? (
-                                  <span className="flex items-center space-x-1 text-emerald-600 text-xs font-bold"><CheckCircle className="w-3.5 h-3.5" /> <span>Eligible</span></span>
-                                ) : (
-                                  <span className="flex items-center space-x-1 text-rose-600 text-xs font-bold"><XCircle className="w-3.5 h-3.5" /> <span>Not Suitable</span></span>
-                                )}
-                              </td>
-                              <td className="p-4 font-black text-indigo-600">{cand.overall_score}</td>
-                              <td className="p-4 font-semibold text-slate-700">{cand.skill_match}</td>
-                              <td className="p-4">
-                                {cand.critical_missing.length > 0 ? (
-                                  <span className="text-rose-600 text-xs font-bold">{cand.critical_missing.length} skills</span>
-                                ) : (
-                                  <span className="text-slate-400 text-xs font-bold">-</span>
-                                )}
-                              </td>
-                              <td className="p-4">
-                                <button 
-                                  onClick={() => handleViewResult(cand)}
-                                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                                >
-                                  View Full
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  
-                  {/* Side-by-side Modal */}
-                  {showSideBySide && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                      <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                          <h2 className="text-lg font-bold text-slate-800 flex items-center"><Users className="w-5 h-5 mr-2 text-indigo-600" /> Side-by-Side Comparison</h2>
-                          <button onClick={() => dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: false })} className="p-2 hover:bg-slate-200 rounded-lg"><XCircle className="w-5 h-5 text-slate-500" /></button>
-                        </div>
-                        
-                        <div className="p-6 overflow-auto flex-1">
-                          <div className="flex space-x-4 min-w-max">
-                            {selectedCandidates.map(evalId => {
-                              const cand = batchResult.ranked_candidates.find(c => c.evaluation_id === evalId);
-                              if (!cand) return null;
-                              return (
-                                <div key={evalId} className="w-80 border border-slate-200 rounded-xl overflow-hidden flex-shrink-0">
-                                  <div className="p-4 bg-slate-50 border-b border-slate-200">
-                                    <h3 className="font-bold text-slate-800 truncate" title={cand.filename}>{cand.filename}</h3>
-                                    <div className="flex items-center space-x-2 mt-2">
-                                      <span className="text-xl font-black text-indigo-600">{cand.overall_score}</span>
-                                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${cand.policy_eligible ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                        {cand.policy_eligible ? 'Eligible' : 'Failed'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="p-4 space-y-4 text-sm">
-                                    <div>
-                                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Tier</p>
-                                      <p className={`font-semibold ${getRecommendationStyle(cand.recommendation_tier).text}`}>{cand.recommendation_tier}</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-1">Skill</p>
-                                        <p className="font-bold text-slate-700">{cand.skill_match}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase mb-1">Relevance</p>
-                                        <p className="font-bold text-slate-700">{cand.experience_relevance}</p>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-bold text-emerald-600 uppercase mb-1">Strengths ({cand.strengths.length})</p>
-                                      <ul className="list-disc pl-4 space-y-1 text-slate-600 text-xs">
-                                        {cand.strengths.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
-                                        {cand.strengths.length > 3 && <li>+{cand.strengths.length - 3} more</li>}
-                                      </ul>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-bold text-rose-600 uppercase mb-1">Missing Critical</p>
-                                      {cand.critical_missing.length > 0 ? (
-                                        <div className="flex flex-wrap gap-1">
-                                          {cand.critical_missing.map((s, i) => <span key={i} className="px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 rounded text-[10px] font-bold">{s}</span>)}
-                                        </div>
-                                      ) : <p className="text-slate-400 italic text-xs">None</p>}
-                                    </div>
-                                    <div className="pt-4 border-t border-slate-100 text-center">
-                                      <button 
-                                        onClick={() => { dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: false }); handleViewResult(cand); }}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                                      >
-                                        View Full Evaluation
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
               {/* STEPS 2-6: EVALUATION SUITE */}
               {displayStep >= 2 && result && (
                 <EvaluationWizard />
-              )}
-                </div>
               )}
             </>
           )}

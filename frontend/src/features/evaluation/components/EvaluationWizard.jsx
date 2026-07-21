@@ -9,12 +9,27 @@ import LearningStep from '../steps/LearningStep';
 import CommunicationStep from '../steps/CommunicationStep';
 import DecisionStep from '../steps/DecisionStep';
 
-const STEP_COMPONENTS = {
-  2: SuitabilityStep,
-  3: EvidenceStep,
-  4: LearningStep,
-  5: CommunicationStep,
-  6: DecisionStep
+const STEP_REGISTRY = {
+  2: {
+    label: 'Profile Suitability',
+    component: SuitabilityStep
+  },
+  3: {
+    label: 'Factual Evidence',
+    component: EvidenceStep
+  },
+  4: {
+    label: 'Technical Questions',
+    component: LearningStep
+  },
+  5: {
+    label: 'Draft Communication',
+    component: CommunicationStep
+  },
+  6: {
+    label: 'Screening Decision',
+    component: DecisionStep
+  }
 };
 
 export default function EvaluationWizard() {
@@ -37,15 +52,12 @@ export default function EvaluationWizard() {
     return true;
   };
 
-  const stepsList = [
-    { num: 2, label: 'Profile Suitability' },
-    { num: 3, label: 'Factual Evidence' },
-    { num: 4, label: 'Technical Questions' },
-    { num: 5, label: 'Draft Communication' },
-    { num: 6, label: 'Screening Decision' }
-  ];
+  const stepsList = Object.entries(STEP_REGISTRY).map(([num, config]) => ({
+    num: Number(num),
+    label: config.label
+  }));
 
-  const ActiveStepComponent = STEP_COMPONENTS[displayStep];
+  const ActiveStepComponent = STEP_REGISTRY[displayStep]?.component || null;
 
   return (
     <div className="space-y-6">
@@ -65,7 +77,7 @@ export default function EvaluationWizard() {
                   <button
                     key={step.num}
                     disabled={locked}
-                    onClick={() => dispatch({ type: 'SET_STEP', payload: step.num })}
+                    onClick={() => dispatch({ type: 'INGEST/SET_STEP', payload: step.num })}
                     className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                       active 
                         ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-600/20' 
@@ -100,7 +112,7 @@ export default function EvaluationWizard() {
                   while (prevStep >= 2 && !isStepVisible(prevStep)) {
                     prevStep--;
                   }
-                  dispatch({ type: 'SET_STEP', payload: prevStep });
+                  dispatch({ type: 'INGEST/SET_STEP', payload: prevStep });
                 }}
                 className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-surface-850 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
               >
@@ -114,7 +126,7 @@ export default function EvaluationWizard() {
                   while (nextStep <= 6 && !isStepVisible(nextStep)) {
                     nextStep++;
                   }
-                  dispatch({ type: 'SET_STEP', payload: nextStep });
+                  dispatch({ type: 'INGEST/SET_STEP', payload: nextStep });
                 }}
                 className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-surface-850 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
               >
