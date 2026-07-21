@@ -5,6 +5,8 @@ import CandidatePortal from './pages/CandidatePortal';
 import AppLayout from './components/layout/AppLayout';
 import { evaluationService } from './services/evaluationService';
 
+import { EvaluationProvider } from './features/evaluation/context/EvaluationContext';
+
 function App() {
   const [dbStatus, setDbStatus] = useState('Checking...');
   const [activeRole, setActiveRole] = useState(() => {
@@ -36,7 +38,11 @@ function App() {
             element={
               activeRole === 'Candidate'
                 ? <Navigate to="/candidate" replace />
-                : <RecruiterDashboard activeRole={activeRole} />
+                : (
+                  <EvaluationProvider>
+                    <RecruiterDashboard activeRole={activeRole} />
+                  </EvaluationProvider>
+                )
             }
           />
           <Route
