@@ -5,12 +5,12 @@ Reconstructed after Phase 5 data loss.
 """
 from typing import Dict, Any
 
-def validate_parsed_resume(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+def validate(parsed_data: Dict[str, Any], sections: Dict[str, Any] = None, raw_text: str = None) -> Dict[str, Any]:
     """
     Validates a parsed resume payload and returns a ParserValidationReport dictionary.
     Deterministic validation without LLM calls.
     """
-    sections = ["education", "experience", "skills"]
+    required_sections = ["education", "experience", "skills"]
     report = {
         "overall_score": 100.0,
         "sections": {},
@@ -18,7 +18,7 @@ def validate_parsed_resume(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
         "repair_sections": []
     }
     
-    for sec in sections:
+    for sec in required_sections:
         val = parsed_data.get(sec, [])
         status = "PASS" if val else "FAIL"
         score = 100.0 if val else 0.0
@@ -42,3 +42,5 @@ def validate_parsed_resume(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     report["overall_score"] = max(0.0, round(report["overall_score"], 2))
     
     return report
+
+validate_parsed_resume = validate

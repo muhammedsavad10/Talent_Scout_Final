@@ -10,7 +10,7 @@ from app.agents.normalization import normalize_skills_list
 from app.agents.parser_validation import validate_parsed_resume
 from app.agents.deterministic_extractor import extract_contact_info, extract_known_skills
 from app.agents.decision_engine import run_decision_engine
-from app.agents.scout import parse_resume_stub
+from app.agents.ingestion import parse_resume_to_json
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,8 @@ async def run_evaluation_pipeline(text: str, candidate_id: str, required_skills:
         required_skills = []
         
     try:
-        # 1. Parser (Delegated to Scout/LLM facade)
-        parsed_resume = parse_resume_stub(text)
+        # 1. Parser (Delegated to LLM)
+        parsed_resume = parse_resume_to_json(text)
         if not parsed_resume:
             return {"status": "error", "error_stage": "parser", "message": "Failed to parse resume"}
             

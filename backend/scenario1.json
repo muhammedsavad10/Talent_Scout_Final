@@ -1,0 +1,100 @@
+{
+  "evaluation_id": "eval_py_dev",
+  "status": "success",
+  "personal_info": {
+    "name": "Muhammed Savad",
+    "email": "savad@example.com",
+    "phone": null,
+    "links": []
+  },
+  "contacts": {
+    "email": "savad@example.com",
+    "phone": null,
+    "links": []
+  },
+  "overall_score": 50,
+  "decision_engine": {
+    "overall_score": 50,
+    "dimension_scores": {
+      "skill_match": "score=40 confidence=100 weight=0.4 evidence=['Matched 2 out of 5 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_quantity": "score=20 confidence=100 weight=0.2 evidence=['Found 1 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
+    },
+    "evidence_states": {
+      "MATCHED": [
+        "Python",
+        "SQL"
+      ],
+      "INFERRED": [],
+      "MISSING": [
+        "TensorFlow",
+        "Qdrant",
+        "Pandas"
+      ],
+      "CONTRADICTED": []
+    },
+    "policy_eligible": false,
+    "policy_flags": [
+      "Overall score 50 below minimum 60",
+      "Skill score 40 below minimum 50",
+      "Missing mandatory skill: TensorFlow",
+      "Missing mandatory skill: Qdrant",
+      "Missing mandatory skill: Pandas"
+    ],
+    "recommendation": {
+      "hiring_recommendation": "Reject",
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Overall score 50 below minimum 60",
+          "Skill score 40 below minimum 50",
+          "Missing mandatory skill: TensorFlow",
+          "Missing mandatory skill: Qdrant",
+          "Missing mandatory skill: Pandas"
+        ],
+        "critical_missing_skills": [
+          "TensorFlow",
+          "Qdrant",
+          "Pandas"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 50 below minimum 60\n - Skill score 40 below minimum 50\n - Missing mandatory skill: TensorFlow\n - Missing mandatory skill: Qdrant\n - Missing mandatory skill: Pandas"
+      }
+    },
+    "recommendation_basis": {
+      "strengths": [],
+      "weaknesses": [
+        "Overall score 50 below minimum 60",
+        "Skill score 40 below minimum 50",
+        "Missing mandatory skill: TensorFlow",
+        "Missing mandatory skill: Qdrant",
+        "Missing mandatory skill: Pandas"
+      ],
+      "critical_missing_skills": [
+        "TensorFlow",
+        "Qdrant",
+        "Pandas"
+      ],
+      "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 50 below minimum 60\n - Skill score 40 below minimum 50\n - Missing mandatory skill: TensorFlow\n - Missing mandatory skill: Qdrant\n - Missing mandatory skill: Pandas"
+    }
+  },
+  "recommendation": {
+    "hiring_recommendation": "Reject",
+    "recommendation_basis": {
+      "strengths": [],
+      "weaknesses": [
+        "Overall score 50 below minimum 60",
+        "Skill score 40 below minimum 50",
+        "Missing mandatory skill: TensorFlow",
+        "Missing mandatory skill: Qdrant",
+        "Missing mandatory skill: Pandas"
+      ],
+      "critical_missing_skills": [
+        "TensorFlow",
+        "Qdrant",
+        "Pandas"
+      ],
+      "reasoning": "Candidate failed one or more mandatory policy gates.\n - Overall score 50 below minimum 60\n - Skill score 40 below minimum 50\n - Missing mandatory skill: TensorFlow\n - Missing mandatory skill: Qdrant\n - Missing mandatory skill: Pandas"
+    }
+  }
+}

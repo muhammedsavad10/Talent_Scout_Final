@@ -1,0 +1,78 @@
+{
+  "evaluation_id": "eval_strong_ds",
+  "status": "success",
+  "personal_info": {
+    "name": "Dr. Alex Morgan",
+    "email": "alex@example.com",
+    "phone": null,
+    "links": []
+  },
+  "contacts": {
+    "email": "alex@example.com",
+    "phone": null,
+    "links": []
+  },
+  "overall_score": 66,
+  "decision_engine": {
+    "overall_score": 66,
+    "dimension_scores": {
+      "skill_match": "score=80 confidence=100 weight=0.4 evidence=['Matched 4 out of 5 required skills.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_quantity": "score=20 confidence=100 weight=0.2 evidence=['Found 1 roles.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_relevance": "score=75 confidence=100 weight=0.25 evidence=['Deterministic baseline relevance.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None",
+      "experience_quality": "score=80 confidence=100 weight=0.15 evidence=['Deterministic baseline quality.'] status='EVALUATED' sources=['resume'] health=None sub_metrics=None"
+    },
+    "evidence_states": {
+      "MATCHED": [
+        "Python",
+        "SQL",
+        "Qdrant",
+        "Pandas"
+      ],
+      "INFERRED": [],
+      "MISSING": [
+        "TensorFlow"
+      ],
+      "CONTRADICTED": []
+    },
+    "policy_eligible": false,
+    "policy_flags": [
+      "Missing mandatory skill: TensorFlow"
+    ],
+    "recommendation": {
+      "hiring_recommendation": "Reject",
+      "recommendation_basis": {
+        "strengths": [],
+        "weaknesses": [
+          "Missing mandatory skill: TensorFlow"
+        ],
+        "critical_missing_skills": [
+          "TensorFlow"
+        ],
+        "reasoning": "Candidate failed one or more mandatory policy gates.\n - Missing mandatory skill: TensorFlow"
+      }
+    },
+    "recommendation_basis": {
+      "strengths": [],
+      "weaknesses": [
+        "Missing mandatory skill: TensorFlow"
+      ],
+      "critical_missing_skills": [
+        "TensorFlow"
+      ],
+      "reasoning": "Candidate failed one or more mandatory policy gates.\n - Missing mandatory skill: TensorFlow"
+    }
+  },
+  "recommendation": {
+    "hiring_recommendation": "Reject",
+    "recommendation_basis": {
+      "strengths": [],
+      "weaknesses": [
+        "Missing mandatory skill: TensorFlow"
+      ],
+      "critical_missing_skills": [
+        "TensorFlow"
+      ],
+      "reasoning": "Candidate failed one or more mandatory policy gates.\n - Missing mandatory skill: TensorFlow"
+    }
+  }
+}

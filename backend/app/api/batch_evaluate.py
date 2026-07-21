@@ -66,7 +66,7 @@ async def process_batch(batch_id: str, files: List[UploadFile], jd_skills: List[
             else:
                 failed += 1
         except Exception as e:
-            logger.error(f"Batch eval failed for {file.filename}: {e}")
+            logger.exception(f"Batch eval failed for {file.filename}: {e}")
             failed += 1
             
         await evaluation_store.update_batch_status(batch_id, {

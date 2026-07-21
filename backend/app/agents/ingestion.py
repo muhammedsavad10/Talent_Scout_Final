@@ -247,7 +247,7 @@ def parse_resume_to_json(raw_text: str) -> dict:
         
         parser_history.append({
             "attempt": 1,
-            "overall_score": validation_report.overall_score,
+            "overall_score": validation_report.get("overall_score", 100.0) if isinstance(validation_report, dict) else getattr(validation_report, "overall_score", 100.0),
             "repair": False
         })
         
@@ -266,7 +266,7 @@ def parse_resume_to_json(raw_text: str) -> dict:
             "garbage_rate": 0.0,
             "duplicate_rate": 0.0,
             "structure_quality": sum(s.get("confidence", 100) for s in skills_list) / max(1, total_skills) if total_skills > 0 else 100.0,
-            "overall_score": validation_report.overall_score,
+            "overall_score": validation_report.get("overall_score", 100.0) if isinstance(validation_report, dict) else getattr(validation_report, "overall_score", 100.0),
             
             # Execution Stats
             "deterministic_items": len(detailed_skills) + len(certs) + len(langs),
@@ -274,12 +274,12 @@ def parse_resume_to_json(raw_text: str) -> dict:
             "repaired_items": 0,
             "duplicates_removed": len(extracted_skills) - len(detailed_skills),
             "garbage_removed": 0, 
-            "repair_triggered": validation_report.repair_performed,
+            "repair_triggered": validation_report.get("repair_performed", False) if isinstance(validation_report, dict) else getattr(validation_report, "repair_performed", False),
             "repair_latency_ms": repair_latency_ms,
-            "repair_calls": 1 if validation_report.repair_performed else 0,
-            "llm_repairs": 1 if validation_report.repair_performed else 0,
-            "sections_repaired": validation_report.repair_sections,
-            "section_scores": {k: v.section_score for k, v in validation_report.sections.items()}
+            "repair_calls": 1 if (validation_report.get("repair_performed", False) if isinstance(validation_report, dict) else getattr(validation_report, "repair_performed", False)) else 0,
+            "llm_repairs": 1 if (validation_report.get("repair_performed", False) if isinstance(validation_report, dict) else getattr(validation_report, "repair_performed", False)) else 0,
+            "sections_repaired": validation_report.get("repair_sections", []) if isinstance(validation_report, dict) else getattr(validation_report, "repair_sections", []),
+            "section_scores": {k: v.get("section_score", 100.0) if isinstance(v, dict) else getattr(v, "section_score", 100.0) for k, v in (validation_report.get("sections", {}) if isinstance(validation_report, dict) else getattr(validation_report, "sections", {})).items()}
         }
         
         # Generate Ontology Suggestions for unknown skills with high confidence
@@ -320,7 +320,7 @@ def parse_resume_to_json(raw_text: str) -> dict:
             "personal_info": parsed_data.get("personal_info") or {},
             "languages": parsed_data.get("languages") or [],
             "awards": parsed_data.get("awards") or [],
-            "parser_validation": validation_report.model_dump(),
+            "parser_validation": validation_report if isinstance(validation_report, dict) else validation_report.model_dump(),
             "parser_history": parser_history,
             "parser_metrics": parser_metrics,
             "ontology_metrics": ontology_metrics

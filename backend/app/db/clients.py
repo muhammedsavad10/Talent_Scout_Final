@@ -31,8 +31,13 @@ def get_qdrant_client() -> QdrantClient:
         QdrantClient: The active connection to the vector database.
     """
     try:
-        client = QdrantClient(location=":memory:")
-        logger.info("Successfully initialized Qdrant client in memory.")
+        if not getattr(settings, "QDRANT_URL", None) or not getattr(settings, "QDRANT_API_KEY", None):
+            raise ValueError("QDRANT_URL or QDRANT_API_KEY missing in settings.")
+        client = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY
+        )
+        logger.info("Successfully initialized Qdrant client to real endpoint.")
         return client
     except Exception as e:
         logger.error(f"Failed to initialize Qdrant client: {e}")

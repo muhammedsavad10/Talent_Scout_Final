@@ -10,19 +10,44 @@ logger = logging.getLogger(__name__)
 
 class EvaluationStore:
     def __init__(self):
-        self._evaluations: Dict[str, Dict[str, Any]] = {}
-        self._batches: Dict[str, Dict[str, Any]] = {}
-        
+        from app.db.clients import supabase_db
+        self.db = supabase_db
+        self._batches: Dict[str, Dict[str, Any]] = {} # Fallback for batches if no table exists
+
     async def save_evaluation(self, evaluation_id: str, data: Dict[str, Any]) -> bool:
-        self._evaluations[evaluation_id] = data
-        logger.info(f"Saved evaluation {evaluation_id} to in-memory store.")
-        return True
+        import json
+        def _serialize(obj):
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump()
+            elif hasattr(obj, "dict"):
+                return obj.dict()
+            return str(obj)
+            
+        try:
+            serialized_data = json.loads(json.dumps(data, default=_serialize))
+            self.db.table("evaluations").upsert({
+                "id": evaluation_id,
+                "data": serialized_data
+            }).execute()
+            logger.info(f"Saved evaluation {evaluation_id} to Supabase.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save evaluation {evaluation_id}: {e}")
+            return False
         
     async def get_evaluation(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
-        return self._evaluations.get(evaluation_id)
+        try:
+            response = self.db.table("evaluations").select("data").eq("id", evaluation_id).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0].get("data")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get evaluation {evaluation_id}: {e}")
+            return None
 
     async def create_batch(self, batch_id: str, total: int) -> bool:
-        self._batches[batch_id] = {
+        # Save batch state to evaluations table using the batch_id as the primary key
+        batch_data = {
             "batch_id": batch_id,
             "status": "PROCESSING",
             "total": total,
@@ -34,17 +59,17 @@ class EvaluationStore:
             "results": {"ranked_candidates": []},
             "raw_evaluations": []
         }
-        logger.info(f"Created batch {batch_id} in memory.")
-        return True
+        return await self.save_evaluation(batch_id, batch_data)
 
     async def update_batch_status(self, batch_id: str, status_data: Dict[str, Any]) -> bool:
-        if batch_id in self._batches:
-            self._batches[batch_id].update(status_data)
-            return True
+        current_data = await self.get_evaluation(batch_id)
+        if current_data:
+            current_data.update(status_data)
+            return await self.save_evaluation(batch_id, current_data)
         return False
         
     async def get_batch_status(self, batch_id: str) -> Optional[Dict[str, Any]]:
-        return self._batches.get(batch_id)
+        return await self.get_evaluation(batch_id)
 
 # Singleton instance
 evaluation_store = EvaluationStore()
