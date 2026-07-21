@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   Target, Award, BookOpen, CheckCircle, ArrowRight, FileText, Sparkles, HelpCircle, AlertCircle, Play
 } from 'lucide-react';
+import { mapEvaluationResponse } from '../services/evaluationMapper';
 
 const mockEvaluationData = {
   status: "success",
@@ -82,29 +83,13 @@ const CandidatePortal = ({ evaluationData = null, activeRole = 'Candidate' }) =>
     setIsUsingLive(false);
   };
 
-  // Safe variables parsing
-  const filename = data.filename || "resume.pdf";
-  
-  // Extract score safely (handles floats 0.815 -> 82% AND integers 54 -> 54%)
-  const rawScore = data.overall_score ?? data.decision_engine?.overall_score ?? data.evaluation?.semantic_match_score ?? data.evaluation?.explicit_xAI_metrics?.weighted_score ?? data.evaluation?.explicit_xai_metrics?.weighted_score ?? 0;
-  const overallScorePercent = typeof rawScore === 'number' && rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
-
-  // Extract strengths and missing skills from schemas safely
-  const matchedSkills = data.decision_engine?.evidence_states?.MATCHED
-                        || data.evidence_states?.MATCHED
-                        || data.evidence?.skills_evidence?.filter(s => s.status?.toLowerCase().includes("identified") && !s.status?.toLowerCase().includes("not")).map(s => s.skill) 
-                        || data.evaluation?.explicit_xai_metrics?.matched_skills 
-                        || data.evaluation?.explicit_xAI_metrics?.matched_skills 
-                        || [];
-                        
-  const missingSkills = data.decision_engine?.evidence_states?.MISSING
-                        || data.evidence_states?.MISSING
-                        || data.evidence?.skills_evidence?.filter(s => s.status?.toLowerCase().includes("not")).map(s => s.skill)
-                        || data.evaluation?.explicit_xai_metrics?.missing_skills
-                        || data.evaluation?.explicit_xAI_metrics?.missing_skills
-                        || [];
-
-  const learningCurve = data.onboarding?.learning_curve || data.decision_engine?.recommendation?.recommendation_basis?.weaknesses?.map(w => ({ skill: w, difficulty: "Moderate", reason: w })) || [];
+  // Centralized Evaluation Mapping
+  const mapped = mapEvaluationResponse(data) || {};
+  const filename = mapped.filename || "resume.pdf";
+  const overallScorePercent = mapped.overallScore ?? 0;
+  const matchedSkills = mapped.evidenceStates?.matched || [];
+  const missingSkills = mapped.evidenceStates?.missing || [];
+  const learningCurve = mapped.onboarding?.learning_curve || mapped.recommendation?.weaknesses?.map(w => ({ skill: w, difficulty: "Moderate", reason: w })) || [];
   const resumeFeedback = data.recruiter?.resume_feedback || [];
 
   // Simple Markdown formatting helper for the AI feedback report

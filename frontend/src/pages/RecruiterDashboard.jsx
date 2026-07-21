@@ -5,6 +5,7 @@ import {
   RefreshCw, ChevronRight, ChevronLeft, Mail, MessageSquare, Send, Terminal, 
   Lock, Unlock, Clock, ArrowUpRight, BookOpen, Award, Check, Save, Edit2, Info, Activity
 } from 'lucide-react';
+import { mapEvaluationResponse } from '../services/evaluationMapper';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -18,22 +19,21 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const [jdText, setJdText] = useState('');
   const [jdSkills, setJdSkills] = useState('');
   const [evaluationId, setEvaluationId] = useState(null); // Active viewed eval ID
+  const [activeStep, setActiveStep] = useState(1); // 1: Ingest, 1.5: Batch Compare, 2: Suitability, 3: Evidence, 4: Onboarding/Interview, 5: Comm, 6: Finalize
+  const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState(null); // Active viewed result
   const [error, setError] = useState(null);
-  
-  // --- Batch & Comparison State ---
+
+  // --- Batch Evaluation State ---
   const [activeBatchId, setActiveBatchId] = useState(null);
   const [batchStatus, setBatchStatus] = useState(null);
   const [batchResult, setBatchResult] = useState(null);
   const [selectedCandidates, setSelectedCandidates] = useState([]);
   const [showSideBySide, setShowSideBySide] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: 'rank', direction: 'asc' });
   const [filterTier, setFilterTier] = useState('All');
+  const [sortConfig, setSortConfig] = useState({ key: 'rank', direction: 'asc' });
 
-  // --- UI State ---
-  const [activeStep, setActiveStep] = useState(1);
-  const [dragActive, setDragActive] = useState(false);
+  // --- Candidate Screening Decision State ---
   const [selectedQuestionsTab, setSelectedQuestionsTab] = useState('easy');
   const [emailTemplateType, setEmailTemplateType] = useState('interview_invite');
   const [emailDraft, setEmailDraft] = useState(null);
@@ -58,84 +58,11 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const [devError, setDevError] = useState('');
   const [isDevDrawerOpen, setIsDevDrawerOpen] = useState(false);
 
-  // --- Data Extraction Helpers (Strict Backend DecisionEngine Schema Alignment) ---
-  const getMatchedSkillsList = (res) => {
-    if (!res) return [];
-    if (res.decision_engine?.evidence_states?.MATCHED) return res.decision_engine.evidence_states.MATCHED;
-    if (res.evidence_states?.MATCHED) return res.evidence_states.MATCHED;
-    if (res.debug?.matched_tokens) return res.debug.matched_tokens;
-    if (res.evidence?.skills_evidence) {
-      return res.evidence.skills_evidence
-        .filter(s => s.status?.toLowerCase().includes('identified') && !s.status?.toLowerCase().includes('not'))
-        .map(s => s.skill);
-    }
-    return [];
-  };
-
-  const getMissingSkillsList = (res) => {
-    if (!res) return [];
-    if (res.decision_engine?.evidence_states?.MISSING) return res.decision_engine.evidence_states.MISSING;
-    if (res.evidence_states?.MISSING) return res.evidence_states.MISSING;
-    if (res.decision_engine?.policy_flags) {
-      const flags = res.decision_engine.policy_flags.filter(f => f.includes('Missing mandatory skill:'));
-      if (flags.length > 0) return flags.map(f => f.replace('Missing mandatory skill:', '').trim());
-    }
-    if (res.evidence?.skills_evidence) {
-      return res.evidence.skills_evidence
-        .filter(s => s.status?.toLowerCase().includes('not'))
-        .map(s => s.skill);
-    }
-    return [];
-  };
-
-  const getEvidenceAuditItems = (res) => {
-    if (!res) return [];
-    if (res.evidence?.skills_evidence && res.evidence.skills_evidence.length > 0) {
-      return res.evidence.skills_evidence;
-    }
-    const matched = getMatchedSkillsList(res);
-    const missing = getMissingSkillsList(res);
-    const items = [];
-    matched.forEach(s => items.push({
-      skill: s,
-      status: "Identified",
-      evidence_strength: "High",
-      project_name: "Resume Extraction",
-      role_held: "Candidate",
-      evidence_snippet: `Skill '${s}' verified in parsed resume.`
-    }));
-    missing.forEach(s => items.push({
-      skill: s,
-      status: "Not Identified",
-      evidence_strength: "None",
-      project_name: null,
-      role_held: null,
-      evidence_snippet: null
-    }));
-    return items;
-  };
-
-  const getHiringRecommendationText = (res) => {
-    if (!res) return 'Review Before Interview';
-    if (res.decision_engine?.recommendation?.hiring_recommendation) return res.decision_engine.recommendation.hiring_recommendation;
-    if (res.recommendation?.hiring_recommendation) return res.recommendation.hiring_recommendation;
-    if (typeof res.recommendation === 'string') return res.recommendation;
-    return 'Review Before Interview';
-  };
-
-  const getRecommendationBasisObj = (res) => {
-    if (!res) return null;
-    if (res.decision_engine?.recommendation?.recommendation_basis) return res.decision_engine.recommendation.recommendation_basis;
-    if (res.recommendation_basis) return res.recommendation_basis;
-    if (res.recommendation?.recommendation_basis) return res.recommendation.recommendation_basis;
-    return null;
-  };
-
   // Reset local state if result changes
   useEffect(() => {
     if (result) {
-      setEditedNotes(result.recruiter?.recruiter_notes || '');
-      setOverrideDecision(getHiringRecommendationText(result));
+      setEditedNotes(result.rawPayload?.recruiter?.recruiter_notes || '');
+      setOverrideDecision(result.recommendation?.tier || 'Review Before Interview');
       setEmailDraft(null);
       setChatMessages([
         {
@@ -347,28 +274,27 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         console.groupEnd();
       }
 
-      const validStates = ['COMPLETED', 'PARTIAL_SUCCESS', 'CORE_COMPLETED', 'ENRICHING_STRATEGY', 'FAILED_STRATEGY'];
-      const evalResult = response.data?.result || response.data;
+      const mapped = mapEvaluationResponse(response.data);
 
-      if (evalResult) {
-        if (!evalResult.filename && candRow.filename) {
-          evalResult.filename = candRow.filename;
+      if (mapped) {
+        if (!mapped.filename && candRow.filename) {
+          mapped.filename = candRow.filename;
         }
 
         if (import.meta.env.DEV) {
-          console.group("💡 [Evaluation Data Flow Diagnostics]");
-          console.log("Filename:", evalResult.filename);
-          console.log("Overall Score:", evalResult.decision_engine?.overall_score ?? evalResult.overall_score);
-          console.log("Skill Match Score:", evalResult.decision_engine?.dimension_scores?.skill_match?.score);
-          console.log("Matched Skills:", getMatchedSkillsList(evalResult));
-          console.log("Missing Skills:", getMissingSkillsList(evalResult));
-          console.log("Recommendation:", getHiringRecommendationText(evalResult));
+          console.group("💡 [Normalized Evaluation Model - 1-to-1 Mapping]");
+          console.log("Overall Score:", mapped.overallScore);
+          console.log("Recommendation Tier:", mapped.recommendation.tier);
+          console.log("Matched Skills:", mapped.evidenceStates.matched);
+          console.log("Missing Skills:", mapped.evidenceStates.missing);
+          console.log("Dimension Scores:", mapped.dimensionScores);
+          console.log("Policy Flags:", mapped.policyFlags);
           console.groupEnd();
         }
 
-        setResult(evalResult);
+        setResult(mapped);
         setEvaluationId(candRow.evaluation_id);
-        localStorage.setItem('lastEvaluation', JSON.stringify(evalResult));
+        localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
         setActiveStep(2);
       } else {
         setError(`Cannot view result: evaluation status is ${response.data?.status} or result is missing`);
@@ -1068,69 +994,50 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                   )}
 
                   {/* Decision Engine Dimension Scores */}
-                  {result.decision_engine?.dimension_scores ? (
+                  {result.dimensionScores && result.dimensionScores.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {Object.entries(result.decision_engine.dimension_scores).map(([dimKey, dimData]) => {
-                        // Format key "skill_match" to "Skill Match"
-                        const title = dimKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        return (
-                          <div key={dimKey} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm text-center space-y-1 hover:border-indigo-300 transition-colors cursor-default" title={dimData.evidence?.join('\n')}>
-                            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block truncate">{title}</span>
-                            <span className="text-2xl sm:text-3xl font-black text-indigo-600 font-sans">
-                              {dimData.score}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-bold tracking-wider block">CONF: {dimData.confidence}%</span>
-                          </div>
-                        );
-                      })}
+                      {result.dimensionScores.map(dim => (
+                        <div key={dim.key} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm text-center space-y-1 hover:border-indigo-300 transition-colors cursor-default" title={dim.evidence?.join('\n')}>
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block truncate">{dim.title}</span>
+                          <span className="text-2xl sm:text-3xl font-black text-indigo-600 font-sans">
+                            {dim.score}
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-bold tracking-wider block">CONF: {dim.confidence}%</span>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center space-y-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Weighted Match</span>
-                        <span className="text-3xl font-black text-indigo-600 font-sans">
-                          {Math.round((result.debug?.raw_weighted_score || 0) * 100)}%
-                        </span>
-                      </div>
-                      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center space-y-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Containment Score</span>
-                        <span className="text-3xl font-black text-indigo-600 font-sans">
-                          {Math.round((result.debug?.raw_containment_score || 0) * 100)}%
-                        </span>
-                      </div>
-                      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center space-y-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Semantic Match</span>
-                        <span className="text-3xl font-black text-indigo-600 font-sans">
-                          {Math.round((result.debug?.raw_semantic_similarity || 0) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  ) : null}
 
-                  {/* Skills Alignment Badges — reads from result.debug.matched_tokens and result.evidence.skills_evidence */}
+                  {/* Skills Alignment Badges */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Matched Skills ({(result.debug?.matched_tokens || []).length})
+                        Matched Skills ({(result.evidenceStates?.matched || []).length})
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {(result.debug?.matched_tokens || []).map((skill, idx) => (
+                        {(result.evidenceStates?.matched || []).map((skill, idx) => (
                           <span key={idx} className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">
                             {skill}
                           </span>
                         ))}
+                        {(result.evidenceStates?.matched || []).length === 0 && (
+                          <p className="text-xs text-slate-400 italic">No skills matched.</p>
+                        )}
                       </div>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Missing Skills ({(result.evidence?.skills_evidence || []).filter(s => s.status?.toLowerCase().includes('not')).length})
+                        Missing Skills ({(result.evidenceStates?.missing || []).length})
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {(result.evidence?.skills_evidence || []).filter(s => s.status?.toLowerCase().includes('not')).map((item, idx) => (
+                        {(result.evidenceStates?.missing || []).map((skill, idx) => (
                           <span key={idx} className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-lg">
-                            {item.skill}
+                            {skill}
                           </span>
                         ))}
+                        {(result.evidenceStates?.missing || []).length === 0 && (
+                          <p className="text-xs text-slate-400 italic font-semibold">All required skills identified!</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1147,94 +1054,70 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                       
                       {/* Classification Badge */}
                       <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide border uppercase shadow-sm ${
-                        getRecommendationStyle(result.recommendation?.hiring_recommendation).bg
+                        getRecommendationStyle(result.recommendation?.tier).bg
                       } ${
-                        getRecommendationStyle(result.recommendation?.hiring_recommendation).text
+                        getRecommendationStyle(result.recommendation?.tier).text
                       }`}>
-                        {result.recommendation?.hiring_recommendation}
+                        {result.recommendation?.tier}
                       </span>
                     </div>
 
-                    {/* Recommendation Basis (New Structured View) */}
-                    {result.recommendation_basis ? (
-                      <div className="space-y-6 pt-2">
+                    {/* Recommendation Basis (Direct from Decision Engine) */}
+                    <div className="space-y-6 pt-2">
+                      {result.recommendation?.reasoning && (
                         <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3">
                           <h3 className="text-sm font-bold text-slate-800">Decision Reasoning</h3>
-                          <p className="text-sm text-slate-600 leading-relaxed">{result.recommendation_basis.decision_reasoning}</p>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Domain Alignment:</span>
-                            <span className="text-sm font-semibold text-slate-700">{result.recommendation_basis.domain_alignment}</span>
-                          </div>
+                          <p className="text-sm text-slate-600 leading-relaxed">{result.recommendation.reasoning}</p>
                         </div>
+                      )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {/* Strengths */}
-                          <div className="space-y-3">
-                            <h3 className="text-sm font-bold text-emerald-600 uppercase tracking-wider flex items-center"><CheckCircle className="w-4 h-4 mr-1.5" /> Strengths</h3>
-                            <ul className="space-y-2">
-                              {(result.recommendation_basis.strengths || []).map((bullet, idx) => (
-                                <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0 mt-2" />
-                                  <span>{bullet}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Weaknesses */}
-                          <div className="space-y-3">
-                            <h3 className="text-sm font-bold text-amber-600 uppercase tracking-wider flex items-center"><AlertCircle className="w-4 h-4 mr-1.5" /> Weaknesses</h3>
-                            <ul className="space-y-2">
-                              {(result.recommendation_basis.weaknesses || []).map((bullet, idx) => (
-                                <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0 mt-2" />
-                                  <span>{bullet}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Critical Missing */}
-                          <div className="space-y-3">
-                            <h3 className="text-sm font-bold text-rose-600 uppercase tracking-wider flex items-center"><XCircle className="w-4 h-4 mr-1.5" /> Critical Missing</h3>
-                            <ul className="space-y-2">
-                              {(result.recommendation_basis.critical_missing_skills || []).map((bullet, idx) => (
-                                <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                  <span className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0 mt-2" />
-                                  <span>{bullet}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Fallback for older responses */
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Strengths */}
                         <div className="space-y-3">
-                          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Hiring Recommendation Rationale</h3>
+                          <h3 className="text-sm font-bold text-emerald-600 uppercase tracking-wider flex items-center"><CheckCircle className="w-4 h-4 mr-1.5" /> Strengths</h3>
                           <ul className="space-y-2">
-                            {result.recommendation?.rationale_bullets?.map((bullet, idx) => (
+                            {(result.recommendation?.strengths || []).map((bullet, idx) => (
                               <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0 mt-2" />
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0 mt-2" />
                                 <span>{bullet}</span>
                               </li>
                             ))}
+                            {(result.recommendation?.strengths || []).length === 0 && (
+                              <p className="text-xs text-slate-400 italic">None reported.</p>
+                            )}
                           </ul>
                         </div>
+
+                        {/* Weaknesses */}
                         <div className="space-y-3">
-                          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Executive Summary</h3>
+                          <h3 className="text-sm font-bold text-amber-600 uppercase tracking-wider flex items-center"><AlertCircle className="w-4 h-4 mr-1.5" /> Weaknesses / Policy Flags</h3>
                           <ul className="space-y-2">
-                            {result.recommendation?.candidate_summary?.map((bullet, idx) => (
+                            {(result.recommendation?.weaknesses?.length > 0 ? result.recommendation.weaknesses : result.policyFlags || []).map((bullet, idx) => (
                               <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0 mt-2" />
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0 mt-2" />
                                 <span>{bullet}</span>
+                              </li>
+                            ))}
+                            {(result.recommendation?.weaknesses?.length === 0 && (result.policyFlags || []).length === 0) && (
+                              <p className="text-xs text-slate-400 italic">No policy flags triggered.</p>
+                            )}
+                          </ul>
+                        </div>
+
+                        {/* Critical Missing */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-bold text-rose-600 uppercase tracking-wider flex items-center"><XCircle className="w-4 h-4 mr-1.5" /> Critical Missing</h3>
+                          <ul className="space-y-2">
+                            {(result.recommendation?.criticalMissingSkills?.length > 0 ? result.recommendation.criticalMissingSkills : result.evidenceStates?.missing || []).map((skill, idx) => (
+                              <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
+                                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0 mt-2" />
+                                <span>{skill}</span>
                               </li>
                             ))}
                           </ul>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Career Timeline */}
@@ -1268,7 +1151,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
               {displayStep === 3 && result && (
                 <div className="space-y-6">
                   
-                  {/* Factual Evidence Accordions */}
+                  {/* Factual Evidence Audit */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
                     <div className="flex items-center space-x-2">
                       <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
@@ -1277,72 +1160,81 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                       <h2 className="text-lg font-bold text-slate-800">3. Factual Evidence Audit</h2>
                     </div>
 
-                    <div className="space-y-3">
-                      {result.evidence?.skills_evidence?.map((item, idx) => {
-                        const isIdentified = item.status.toLowerCase().includes("identified") && !item.status.toLowerCase().includes("not");
-                        const isOpen = !!expandedAccordions[idx];
+                    {result.skillsEvidence && result.skillsEvidence.length > 0 ? (
+                      <div className="space-y-3">
+                        {result.skillsEvidence.map((item, idx) => {
+                          const isIdentified = item.status?.toLowerCase().includes("identified") && !item.status?.toLowerCase().includes("not");
+                          const isOpen = !!expandedAccordions[idx];
 
-                        return (
-                          <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                            {/* Accordion Header */}
-                            <button
-                              onClick={() => toggleAccordion(idx)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition text-left"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <span className="text-sm font-bold text-slate-800">{item.skill}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                  isIdentified ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-rose-50 border border-rose-200 text-rose-700'
-                                }`}>
-                                  {isIdentified ? 'Identified' : 'Not identified'}
-                                </span>
-                                {isIdentified && (
+                          return (
+                            <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                              <button
+                                onClick={() => toggleAccordion(idx)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition text-left"
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-sm font-bold text-slate-800">{item.skill}</span>
                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                    item.evidence_strength.toLowerCase() === 'high' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-600'
+                                    isIdentified ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-rose-50 border border-rose-200 text-rose-700'
                                   }`}>
-                                    {item.evidence_strength} Strength
+                                    {isIdentified ? 'Identified' : 'Not identified'}
                                   </span>
-                                )}
-                              </div>
-                              <span className="text-xs font-bold text-slate-400 hover:text-slate-600">
-                                {isOpen ? 'Collapse' : 'Expand'}
-                              </span>
-                            </button>
+                                </div>
+                                <span className="text-xs font-bold text-slate-400 hover:text-slate-600">
+                                  {isOpen ? 'Collapse' : 'Expand'}
+                                </span>
+                              </button>
 
-                            {/* Accordion Details */}
-                            {isOpen && (
-                              <div className="p-4 bg-slate-50/50 border-t border-slate-100 text-xs text-slate-600 space-y-3">
-                                {isIdentified ? (
-                                  <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      {item.project_name && (
-                                        <div>
-                                          <span className="font-bold text-slate-400 block uppercase text-[10px]">Project</span>
-                                          <span className="text-slate-700 font-semibold">{item.project_name}</span>
-                                        </div>
-                                      )}
-                                      {item.role_held && (
-                                        <div>
-                                          <span className="font-bold text-slate-400 block uppercase text-[10px]">Role Held</span>
-                                          <span className="text-slate-700 font-semibold">{item.role_held}</span>
-                                        </div>
-                                      )}
+                              {isOpen && (
+                                <div className="p-4 bg-slate-50/50 border-t border-slate-100 text-xs text-slate-600 space-y-3">
+                                  {item.evidence_snippet && (
+                                    <div className="bg-white border border-slate-200 rounded-lg p-3 italic text-slate-700">
+                                      "{item.evidence_snippet}"
                                     </div>
-                                    {item.evidence_snippet && (
-                                      <div className="bg-white border border-slate-200 rounded-lg p-3 italic text-slate-700">
-                                        "{item.evidence_snippet}"
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <p className="text-slate-400 italic">No evidence snippet exists because the skill was not identified in the submitted resume text.</p>
-                                )}
-                              </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Direct evidenceStates display from backend (NO synthetic text) */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                          <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center">
+                            <CheckCircle className="w-4 h-4 mr-1.5" /> Identified / Matched Skills ({result.evidenceStates?.matched?.length || 0})
+                          </h3>
+                          <ul className="space-y-1.5">
+                            {(result.evidenceStates?.matched || []).map((skill, idx) => (
+                              <li key={idx} className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                                <span>{skill}</span>
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Verified</span>
+                              </li>
+                            ))}
+                            {(result.evidenceStates?.matched || []).length === 0 && (
+                              <p className="text-xs text-slate-400 italic">No skills matched.</p>
                             )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          </ul>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                          <h3 className="text-xs font-bold text-rose-700 uppercase tracking-wider flex items-center">
+                            <XCircle className="w-4 h-4 mr-1.5" /> Missing Skills ({result.evidenceStates?.missing?.length || 0})
+                          </h3>
+                          <ul className="space-y-1.5">
+                            {(result.evidenceStates?.missing || []).map((skill, idx) => (
+                              <li key={idx} className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                                <span>{skill}</span>
+                                <span className="text-[10px] font-bold text-rose-600 uppercase">Not Found</span>
+                              </li>
+                            ))}
+                            {(result.evidenceStates?.missing || []).length === 0 && (
+                              <p className="text-xs text-slate-400 italic font-semibold">All required skills identified!</p>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Business Impact Metrics */}
