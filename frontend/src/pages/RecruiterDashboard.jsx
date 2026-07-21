@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { 
   Users, UploadCloud, Briefcase, FileText, CheckCircle, XCircle, AlertCircle, 
   RefreshCw, ChevronRight, ChevronLeft, Mail, MessageSquare, Send, Terminal, 
@@ -7,8 +6,10 @@ import {
 } from 'lucide-react';
 import { mapEvaluationResponse } from '../services/evaluationMapper';
 import { getDimensionLabel } from '../utils/dimensionLabels';
-
-const API_BASE_URL = 'http://localhost:8000';
+import { evaluationService } from '../services/evaluationService';
+import { batchService } from '../services/batchService';
+import { candidateService } from '../services/candidateService';
+import { chatService } from '../services/chatService';
 
 const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   // --- Authentication / Authorization State (RBAC) ---
@@ -176,20 +177,18 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         console.groupEnd();
       }
 
-      const response = await axios.post(`${API_BASE_URL}/api/v1/evaluate/batch`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const data = await batchService.batchEvaluate(formData);
 
       if (import.meta.env.DEV) {
         console.group("✅ [Upload Response]");
-        console.log(response.data);
+        console.log(data);
         console.groupEnd();
       }
 
-      const bId = response.data.batch_id;
+      const bId = data.batch_id;
       if (bId) {
         setActiveBatchId(bId);
-        setBatchStatus(response.data);
+        setBatchStatus(data);
         pollBatchJob(bId);
       }
     } catch (err) {
@@ -213,34 +212,34 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
           return;
         }
         
-        const res = await axios.get(`${API_BASE_URL}/api/v1/evaluate/batch/${bId}`);
-        setBatchStatus(res.data);
+        const data = await batchService.getBatchStatus(bId);
+        setBatchStatus(data);
 
         if (import.meta.env.DEV) {
           console.group(`🔄 [Polling Response] Batch ID: ${bId}`);
-          console.log("Status:", res.data.status, `(${res.data.completed}/${res.data.total} completed)`);
-          if (res.data.results?.ranked_candidates) {
-            console.table(res.data.results.ranked_candidates);
+          console.log("Status:", data.status, `(${data.completed}/${data.total} completed)`);
+          if (data.results?.ranked_candidates) {
+            console.table(data.results.ranked_candidates);
           }
           console.groupEnd();
         }
         
-        if (res.data.status === 'COMPLETED' || res.data.status === 'COMPLETED_WITH_ERRORS' || res.data.status === 'FAILED') {
+        if (data.status === 'COMPLETED' || data.status === 'COMPLETED_WITH_ERRORS' || data.status === 'FAILED') {
           clearInterval(pollInterval);
           
-          if (res.data.status === 'FAILED') {
-            setError(res.data.error || "Batch processing failed.");
+          if (data.status === 'FAILED') {
+            setError(data.error || "Batch processing failed.");
             return;
           }
           
-          setBatchResult(res.data.results);
-          if (res.data.status === 'COMPLETED_WITH_ERRORS') {
+          setBatchResult(data.results);
+          if (data.status === 'COMPLETED_WITH_ERRORS') {
             setError("Batch completed but some post-processing errors occurred.");
-          } else if (res.data.failed > 0 && res.data.completed === 0) {
+          } else if (data.failed > 0 && data.completed === 0) {
             setError("All evaluations failed in the batch.");
-          } else if (res.data.results?.ranked_candidates?.length >= 1) {
+          } else if (data.results?.ranked_candidates?.length >= 1) {
             // Auto-load top candidate result
-            handleViewResult(res.data.results.ranked_candidates[0]);
+            handleViewResult(data.results.ranked_candidates[0]);
           }
         }
       } catch (err) {
@@ -261,14 +260,14 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         console.log("Candidate Row:", candRow);
       }
 
-      const response = await axios.get(`${API_BASE_URL}/api/v1/evaluation/status/${candRow.evaluation_id}`);
+      const data = await evaluationService.getEvaluationStatus(candRow.evaluation_id);
       
       if (import.meta.env.DEV) {
-        console.log("Raw GET /status Response:", response.data);
+        console.log("Raw GET /status Response:", data);
         console.groupEnd();
       }
 
-      const mapped = mapEvaluationResponse(response.data);
+      const mapped = mapEvaluationResponse(data);
 
       if (mapped) {
         if (!mapped.filename && candRow.filename) {
@@ -291,7 +290,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
         setActiveStep(2);
       } else {
-        setError(`Cannot view result: evaluation status is ${response.data?.status} or result is missing`);
+        setError(`Cannot view result: evaluation status is ${data?.status} or result is missing`);
       }
     } catch (err) {
       setError("Failed to fetch full evaluation payload.");
@@ -322,8 +321,8 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         custom_recruiter_notes: editedNotes
       };
       
-      const response = await axios.post(`${API_BASE_URL}/api/v1/evaluation/email/generate`, payload);
-      setEmailDraft(response.data);
+      const data = await candidateService.generateCommunicationEmail(payload);
+      setEmailDraft(data);
     } catch (err) {
       console.error(err);
       alert("Failed to generate communication draft.");
@@ -358,11 +357,11 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         skills_evidence: result.evidence?.skills_evidence || []
       };
 
-      const response = await axios.post(`${API_BASE_URL}/api/v1/evaluation/assistant/ask`, payload);
+      const data = await chatService.askAssistant(payload);
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: response.data.answer,
-        citations: response.data.citations || []
+        content: data.answer,
+        citations: data.citations || []
       }]);
     } catch (err) {
       console.error(err);
@@ -381,15 +380,13 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     e.preventDefault();
     setDevError('');
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/v1/evaluation/dev-mode/verify`, {
-        password: devPassword
-      });
-      if (res.data.success) {
+      const data = await evaluationService.verifyDevMode(devPassword);
+      if (data.success) {
         setIsDevUnlocked(true);
         setDevPassword('');
       }
     } catch (err) {
-      setDevError(err.response?.data?.detail || "Verification failed. Try again.");
+      setDevError(err.message || "Verification failed. Try again.");
     }
   };
 
