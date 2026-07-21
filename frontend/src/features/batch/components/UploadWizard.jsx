@@ -25,7 +25,7 @@ export default function UploadWizard() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf'));
       if (droppedFiles.length > 0) {
-        dispatch({ type: 'ADD_FILES', payload: droppedFiles });
+        dispatch({ type: 'INGEST/ADD_FILES', payload: droppedFiles });
       }
     }
   };
@@ -33,19 +33,19 @@ export default function UploadWizard() {
   const handleFileChange = (e) => {
     if (e.target.files) {
       const selected = Array.from(e.target.files).filter(f => f.name.endsWith('.pdf'));
-      dispatch({ type: 'ADD_FILES', payload: selected });
+      dispatch({ type: 'INGEST/ADD_FILES', payload: selected });
     }
   };
 
   const removeFile = (index) => {
-    dispatch({ type: 'REMOVE_FILE', payload: index });
+    dispatch({ type: 'INGEST/REMOVE_FILE', payload: index });
   };
 
   const handleSubmitEvaluation = async (e) => {
     e.preventDefault();
     if (files.length === 0 || !jdText.trim()) return;
 
-    dispatch({ type: 'START_LOADING' });
+    dispatch({ type: 'INGEST/START_LOADING' });
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
     formData.append('job_description', jdText);
@@ -70,13 +70,13 @@ export default function UploadWizard() {
         console.groupEnd();
       }
 
-      dispatch({ type: 'SUBMIT_BATCH_SUCCESS', payload: data });
+      dispatch({ type: 'BATCH/SUBMIT_SUCCESS', payload: data });
       
       // Call standard dashboard flow for poll
       // (Dashboard page handles polling side effects via useEffect on activeBatchId)
     } catch (err) {
       console.error("❌ Upload Error:", err);
-      dispatch({ type: 'SET_ERROR', payload: err.message || "Batch upload failed." });
+      dispatch({ type: 'INGEST/SET_ERROR', payload: err.message || "Batch upload failed." });
     }
   };
 
@@ -97,7 +97,7 @@ export default function UploadWizard() {
             className="w-full h-48 p-3 border border-slate-200 dark:border-slate-850 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition text-slate-700 dark:text-slate-200 bg-slate-50/30 dark:bg-surface-950 text-sm font-medium"
             placeholder="Paste core Job Description text here..."
             value={jdText}
-            onChange={(e) => dispatch({ type: 'SET_JD_TEXT', payload: e.target.value })}
+            onChange={(e) => dispatch({ type: 'INGEST/SET_JD_TEXT', payload: e.target.value })}
           />
         </div>
 
@@ -111,7 +111,7 @@ export default function UploadWizard() {
             className="w-full p-3 border border-slate-200 dark:border-slate-850 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition text-slate-700 dark:text-slate-200 bg-slate-50/30 dark:bg-surface-950 text-sm"
             placeholder="e.g. AWS, Python, Kubernetes"
             value={jdSkills}
-            onChange={(e) => dispatch({ type: 'SET_JD_SKILLS', payload: e.target.value })}
+            onChange={(e) => dispatch({ type: 'INGEST/SET_JD_SKILLS', payload: e.target.value })}
           />
         </div>
 

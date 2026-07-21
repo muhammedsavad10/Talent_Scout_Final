@@ -11,11 +11,11 @@ export default function DecisionStep() {
   if (!result) return null;
 
   const handleSubmitScreening = async () => {
-    dispatch({ type: 'SUBMIT_SCREENING_START' });
+    dispatch({ type: 'DECISION/SUBMIT_START' });
     setTimeout(() => {
-      dispatch({ type: 'SUBMIT_SCREENING_SUCCESS' });
+      dispatch({ type: 'DECISION/SUBMIT_SUCCESS' });
       setTimeout(() => {
-        dispatch({ type: 'RESET_SCREENING_STATE' });
+        dispatch({ type: 'DECISION/RESET_STATE' });
       }, 3000);
     }, 1000);
   };
@@ -40,7 +40,7 @@ export default function DecisionStep() {
               <button
                 key={opt}
                 type="button"
-                onClick={() => dispatch({ type: 'UPDATE_DECISION', payload: opt })}
+                onClick={() => dispatch({ type: 'DECISION/UPDATE_DECISION', payload: opt })}
                 className={`p-4 border rounded-xl text-sm font-bold shadow-sm transition flex flex-col items-center space-y-2 ${
                   active
                     ? opt === 'Shortlist' 
@@ -81,7 +81,7 @@ export default function DecisionStep() {
           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-sans">Recruiter Notes</label>
           <button
             type="button"
-            onClick={() => dispatch({ type: 'SET_NOTES_EDITABLE', payload: !notesEditable })}
+            onClick={() => dispatch({ type: 'DECISION/SET_NOTES_EDITABLE', payload: !notesEditable })}
             className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 flex items-center space-x-1"
           >
             {notesEditable ? (
@@ -102,7 +102,7 @@ export default function DecisionStep() {
           rows={5}
           readOnly={!notesEditable}
           value={editedNotes}
-          onChange={(e) => dispatch({ type: 'UPDATE_NOTES', payload: e.target.value })}
+          onChange={(e) => dispatch({ type: 'DECISION/UPDATE_NOTES', payload: e.target.value })}
           className={`w-full p-3 border rounded-xl focus:outline-none transition text-xs font-medium text-slate-700 dark:text-slate-200 ${
             notesEditable 
               ? 'border-indigo-400 bg-white dark:bg-surface-900 ring-2 ring-indigo-500/10 focus:ring-2 focus:ring-indigo-500' 

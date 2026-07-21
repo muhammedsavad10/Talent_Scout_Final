@@ -22,7 +22,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const {
     isLoading, error, activeStep, result, batchResult, activeBatchId,
     batchStatus, selectedCandidates, showSideBySide, filterTier, sortConfig,
-    chatMessages, chatInput, isChatLoading
+    chatMessages, isChatLoading
   } = state;
 
   // Handle access restrictions for Candidate role on Recruiter Dashboard
@@ -52,6 +52,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const displayStep = isInterviewer ? 4 : activeStep;
 
   // --- Local UI-only states ---
+  const [chatInput, setChatInput] = useState('');
   const [devPassword, setDevPassword] = useState('');
   const [isDevUnlocked, setIsDevUnlocked] = useState(false);
   const [devError, setDevError] = useState('');
@@ -66,12 +67,12 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
       try {
         if (Date.now() - startTime > 30 * 60 * 1000) { // 30 mins max timeout
           clearInterval(pollInterval);
-          dispatch({ type: 'SET_ERROR', payload: "Batch Evaluation Timeout." });
+          dispatch({ type: 'INGEST/SET_ERROR', payload: "Batch Evaluation Timeout." });
           return;
         }
         
         const data = await batchService.getBatchStatus(activeBatchId);
-        dispatch({ type: 'POLL_BATCH_TICK', payload: data });
+        dispatch({ type: 'BATCH/POLL_TICK', payload: data });
 
         if (import.meta.env.DEV) {
           console.group(`🔄 [Polling Response] Batch ID: ${activeBatchId}`);
@@ -86,15 +87,15 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
           clearInterval(pollInterval);
           
           if (data.status === 'FAILED') {
-            dispatch({ type: 'SET_ERROR', payload: data.error || "Batch processing failed." });
+            dispatch({ type: 'INGEST/SET_ERROR', payload: data.error || "Batch processing failed." });
             return;
           }
           
-          dispatch({ type: 'POLL_BATCH_SUCCESS', payload: data.results });
+          dispatch({ type: 'BATCH/POLL_SUCCESS', payload: data.results });
           if (data.status === 'COMPLETED_WITH_ERRORS') {
-            dispatch({ type: 'SET_ERROR', payload: "Batch completed but some post-processing errors occurred." });
+            dispatch({ type: 'INGEST/SET_ERROR', payload: "Batch completed but some post-processing errors occurred." });
           } else if (data.failed > 0 && data.completed === 0) {
-            dispatch({ type: 'SET_ERROR', payload: "All evaluations failed in the batch." });
+            dispatch({ type: 'INGEST/SET_ERROR', payload: "All evaluations failed in the batch." });
           } else if (data.results?.ranked_candidates?.length >= 1) {
             // Auto-load top candidate result
             handleViewResult(data.results.ranked_candidates[0]);
@@ -103,7 +104,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
       } catch (err) {
         if (err.response && err.response.status === 404) {
           clearInterval(pollInterval);
-          dispatch({ type: 'SET_ERROR', payload: "Batch not found." });
+          dispatch({ type: 'INGEST/SET_ERROR', payload: "Batch not found." });
         }
       }
     }, 2000);
@@ -112,8 +113,8 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   }, [activeBatchId]);
 
   const handleViewResult = async (candRow) => {
-    dispatch({ type: 'START_LOADING' });
-    dispatch({ type: 'CLEAR_ERROR' });
+    dispatch({ type: 'INGEST/START_LOADING' });
+    dispatch({ type: 'INGEST/CLEAR_ERROR' });
     try {
       if (import.meta.env.DEV) {
         console.group(`📋 [Evaluation Response] GET /api/v1/evaluation/status/${candRow.evaluation_id}`);
@@ -145,13 +146,13 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
           console.groupEnd();
         }
 
-        dispatch({ type: 'LOAD_RESULT_SUCCESS', payload: { mapped, evaluationId: candRow.evaluation_id } });
+        dispatch({ type: 'EVALUATION/LOAD_SUCCESS', payload: { mapped, evaluationId: candRow.evaluation_id } });
         localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
       } else {
-        dispatch({ type: 'SET_ERROR', payload: `Cannot view result: evaluation status is ${data?.status} or result is missing` });
+        dispatch({ type: 'INGEST/SET_ERROR', payload: `Cannot view result: evaluation status is ${data?.status} or result is missing` });
       }
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: "Failed to fetch full evaluation payload." });
+      dispatch({ type: 'INGEST/SET_ERROR', payload: "Failed to fetch full evaluation payload." });
       console.error("❌ Evaluation Fetch Error:", err);
     }
   };
@@ -161,11 +162,11 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     if (!chatInput.trim() || !result) return;
 
     const userQuestion = chatInput.trim();
-    dispatch({ type: 'SET_CHAT_INPUT', payload: '' });
+    setChatInput('');
     
     // Add user message to state
-    dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'user', content: userQuestion } });
-    dispatch({ type: 'START_CHAT_LOADING' });
+    dispatch({ type: 'CHAT/ADD_MESSAGE', payload: { role: 'user', content: userQuestion } });
+    dispatch({ type: 'CHAT/START_LOADING' });
 
     try {
       // Build history payload for assistant context
@@ -182,20 +183,20 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
       };
 
       const data = await chatService.askAssistant(payload);
-      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: {
+      dispatch({ type: 'CHAT/ADD_MESSAGE', payload: {
         role: 'assistant',
         content: data.answer,
         citations: data.citations || []
       }});
     } catch (err) {
       console.error(err);
-      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: {
+      dispatch({ type: 'CHAT/ADD_MESSAGE', payload: {
         role: 'assistant',
         content: "I'm sorry, I couldn't reach the backend to answer your question.",
         citations: []
       }});
     } finally {
-      dispatch({ type: 'STOP_CHAT_LOADING' });
+      dispatch({ type: 'CHAT/STOP_LOADING' });
     }
   };
 
@@ -218,11 +219,11 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    dispatch({ type: 'SET_SORT_CONFIG', payload: { key, direction } });
+    dispatch({ type: 'BATCH/SET_SORT_CONFIG', payload: { key, direction } });
   };
 
   const toggleCandidateSelection = (evalId) => {
-    dispatch({ type: 'SELECT_CANDIDATE', payload: evalId });
+    dispatch({ type: 'BATCH/SELECT_CANDIDATE', payload: evalId });
   };
 
   const getSortedFilteredCandidates = () => {
