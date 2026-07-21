@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users, ChevronLeft, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { useEvaluation } from '../context/EvaluationContext';
 import DimensionScorePanel from '../components/DimensionScorePanel';

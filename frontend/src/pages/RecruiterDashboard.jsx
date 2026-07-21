@@ -1,13 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, UploadCloud, FileText, CheckCircle, XCircle, AlertCircle, 
-  RefreshCw, Mail, MessageSquare, Send, Terminal, 
-  ArrowUpRight, Save, Edit2
-} from 'lucide-react';
+import { useEffect, useCallback } from 'react';
+import { FileText, XCircle, ArrowUpRight } from 'lucide-react';
 import { mapEvaluationResponse } from '../services/evaluationMapper';
 import { evaluationService } from '../services/evaluationService';
 import { batchService } from '../services/batchService';
-import { chatService } from '../services/chatService';
 import { useEvaluation } from '../features/evaluation/context/EvaluationContext';
 import UploadWizard from '../features/batch/components/UploadWizard';
 import BatchProgress from '../features/batch/components/BatchProgress';
@@ -20,42 +15,54 @@ import DeveloperConsole from '../features/developer/DeveloperConsole';
 const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const { state, dispatch } = useEvaluation();
   const {
-    isLoading, error, activeStep, result, batchResult, activeBatchId,
-    batchStatus, selectedCandidates, showSideBySide, filterTier, sortConfig,
-    chatMessages, isChatLoading
+    isLoading, activeStep, result, batchResult, activeBatchId
   } = state;
 
-  // Handle access restrictions for Candidate role on Recruiter Dashboard
-  if (activeRole === 'Candidate') {
-    return (
-      <div className="max-w-4xl mx-auto p-8 text-center space-y-6">
-        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-800 shadow-sm inline-block">
-          <XCircle className="w-12 h-12 text-rose-500 mx-auto mb-2" />
-          <h2 className="text-xl font-bold">Access Denied</h2>
-          <p className="text-sm mt-1">Candidates do not have access to the internal Recruiter Command Center.</p>
-        </div>
-        <div>
-          <a 
-            href="/candidate" 
-            className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all"
-          >
-            <span>Go to Candidate Portal</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </a>
-        </div>
-      </div>
-    );
-  }
+  // Handle single candidate detailed analysis navigation view
+  const handleViewResult = useCallback(async (candRow) => {
+    dispatch({ type: 'INGEST/START_LOADING' });
+    dispatch({ type: 'INGEST/CLEAR_ERROR' });
+    try {
+      if (import.meta.env.DEV) {
+        console.group(`📋 [Evaluation Response] GET /api/v1/evaluation/status/${candRow.evaluation_id}`);
+        console.log("Candidate Row:", candRow);
+      }
 
-  // Handle Interviewer layout locks (Lock to Step 4: Decide Interview)
-  const isInterviewer = activeRole === 'Interviewer';
-  const displayStep = isInterviewer ? 4 : activeStep;
+      const data = await evaluationService.getEvaluationStatus(candRow.evaluation_id);
+      
+      if (import.meta.env.DEV) {
+        console.log("Raw GET /status Response:", data);
+        console.groupEnd();
+      }
 
-  // --- Local UI-only states ---
-  const [devPassword, setDevPassword] = useState('');
-  const [isDevUnlocked, setIsDevUnlocked] = useState(false);
-  const [devError, setDevError] = useState('');
-  const [isDevDrawerOpen, setIsDevDrawerOpen] = useState(false);
+      const mapped = mapEvaluationResponse(data);
+
+      if (mapped) {
+        if (!mapped.filename && candRow.filename) {
+          mapped.filename = candRow.filename;
+        }
+
+        if (import.meta.env.DEV) {
+          console.group("💡 [Normalized Evaluation Model - 1-to-1 Mapping]");
+          console.log("Overall Score:", mapped.overallScore);
+          console.log("Recommendation Tier:", mapped.recommendation.tier);
+          console.log("Matched Skills:", mapped.evidenceStates.matched);
+          console.log("Missing Skills:", mapped.evidenceStates.missing);
+          console.log("Dimension Scores:", mapped.dimensionScores);
+          console.log("Policy Flags:", mapped.policyFlags);
+          console.groupEnd();
+        }
+
+        dispatch({ type: 'EVALUATION/LOAD_SUCCESS', payload: { mapped, evaluationId: candRow.evaluation_id } });
+        localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
+      } else {
+        dispatch({ type: 'INGEST/SET_ERROR', payload: `Cannot view result: evaluation status is ${data?.status} or result is missing` });
+      }
+    } catch (err) {
+      dispatch({ type: 'INGEST/SET_ERROR', payload: "Failed to fetch full evaluation payload." });
+      console.error("❌ Evaluation Fetch Error:", err);
+    }
+  }, [dispatch]);
 
   // Poll batch status if activeBatchId changes
   useEffect(() => {
@@ -109,66 +116,33 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [activeBatchId]);
+  }, [activeBatchId, dispatch, handleViewResult]);
 
-  const handleViewResult = async (candRow) => {
-    dispatch({ type: 'INGEST/START_LOADING' });
-    dispatch({ type: 'INGEST/CLEAR_ERROR' });
-    try {
-      if (import.meta.env.DEV) {
-        console.group(`📋 [Evaluation Response] GET /api/v1/evaluation/status/${candRow.evaluation_id}`);
-        console.log("Candidate Row:", candRow);
-      }
+  // Handle access restrictions for Candidate role on Recruiter Dashboard
+  if (activeRole === 'Candidate') {
+    return (
+      <div className="max-w-4xl mx-auto p-8 text-center space-y-6">
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-800 shadow-sm inline-block">
+          <XCircle className="w-12 h-12 text-rose-500 mx-auto mb-2" />
+          <h2 className="text-xl font-bold">Access Denied</h2>
+          <p className="text-sm mt-1">Candidates do not have access to the internal Recruiter Command Center.</p>
+        </div>
+        <div>
+          <a 
+            href="/candidate" 
+            className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all"
+          >
+            <span>Go to Candidate Portal</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </a>
+        </div>
+      </div>
+    );
+  }
 
-      const data = await evaluationService.getEvaluationStatus(candRow.evaluation_id);
-      
-      if (import.meta.env.DEV) {
-        console.log("Raw GET /status Response:", data);
-        console.groupEnd();
-      }
-
-      const mapped = mapEvaluationResponse(data);
-
-      if (mapped) {
-        if (!mapped.filename && candRow.filename) {
-          mapped.filename = candRow.filename;
-        }
-
-        if (import.meta.env.DEV) {
-          console.group("💡 [Normalized Evaluation Model - 1-to-1 Mapping]");
-          console.log("Overall Score:", mapped.overallScore);
-          console.log("Recommendation Tier:", mapped.recommendation.tier);
-          console.log("Matched Skills:", mapped.evidenceStates.matched);
-          console.log("Missing Skills:", mapped.evidenceStates.missing);
-          console.log("Dimension Scores:", mapped.dimensionScores);
-          console.log("Policy Flags:", mapped.policyFlags);
-          console.groupEnd();
-        }
-
-        dispatch({ type: 'EVALUATION/LOAD_SUCCESS', payload: { mapped, evaluationId: candRow.evaluation_id } });
-        localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
-      } else {
-        dispatch({ type: 'INGEST/SET_ERROR', payload: `Cannot view result: evaluation status is ${data?.status} or result is missing` });
-      }
-    } catch (err) {
-      dispatch({ type: 'INGEST/SET_ERROR', payload: "Failed to fetch full evaluation payload." });
-      console.error("❌ Evaluation Fetch Error:", err);
-    }
-  };
-
-  const handleUnlockDevMode = async (e) => {
-    e.preventDefault();
-    setDevError('');
-    try {
-      const data = await evaluationService.verifyDevMode(devPassword);
-      if (data.success) {
-        setIsDevUnlocked(true);
-        setDevPassword('');
-      }
-    } catch (err) {
-      setDevError(err.message || "Verification failed. Try again.");
-    }
-  };
+  // Handle Interviewer layout locks (Lock to Step 4: Decide Interview)
+  const isInterviewer = activeRole === 'Interviewer';
+  const displayStep = isInterviewer ? 4 : activeStep;
 
   return (
     <div className="relative space-y-6">

@@ -1,4 +1,3 @@
-import React from 'react';
 import { CheckCircle, AlertCircle, RefreshCw, Save, Edit2 } from 'lucide-react';
 import { useEvaluation } from '../context/EvaluationContext';
 

@@ -4,7 +4,6 @@ import {
   normalizeScore,
   normalizeRecommendation,
   normalizeEvidenceStates,
-  normalizeDimensionScores,
   validateEvaluationResponse
 } from './evaluationMapper';
 

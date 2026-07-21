@@ -1,8 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { evaluationService } from '../../../services/evaluationService';
-import { batchService } from '../../../services/batchService';
-import { candidateService } from '../../../services/candidateService';
-import { chatService } from '../../../services/chatService';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useReducer, useEffect } from 'react';
 import { mapEvaluationResponse } from '../../../services/evaluationMapper';
 
 const EvaluationContext = createContext(null);
@@ -85,7 +82,7 @@ function dashboardReducer(state, action) {
         batchResult: action.payload,
         batchStatus: { ...state.batchStatus, status: 'COMPLETED', results: action.payload }
       };
-    case 'BATCH/SELECT_CANDIDATE':
+    case 'BATCH/SELECT_CANDIDATE': {
       const isSelected = state.selectedCandidates.includes(action.payload);
       return {
         ...state,
@@ -95,6 +92,7 @@ function dashboardReducer(state, action) {
             ? [...state.selectedCandidates, action.payload]
             : state.selectedCandidates
       };
+    }
     case 'BATCH/CLEAR_SELECTION':
       return { ...state, selectedCandidates: [] };
     case 'BATCH/TOGGLE_SIDE_BY_SIDE':
@@ -180,10 +178,14 @@ export function EvaluationProvider({ children }) {
       const stored = localStorage.getItem('lastEvaluation');
       if (stored) {
         const parsed = JSON.parse(stored);
-        dispatch({
-          type: 'EVALUATION/LOAD_SUCCESS',
-          payload: { mapped: parsed, evaluationId: parsed.evaluationId }
-        });
+        const rawToMap = parsed.rawPayload || parsed;
+        const mapped = mapEvaluationResponse(rawToMap);
+        if (mapped) {
+          dispatch({
+            type: 'EVALUATION/LOAD_SUCCESS',
+            payload: { mapped, evaluationId: mapped.evaluationId }
+          });
+        }
       }
     } catch (e) {
       console.warn("Failed to load last evaluation from localStorage:", e);

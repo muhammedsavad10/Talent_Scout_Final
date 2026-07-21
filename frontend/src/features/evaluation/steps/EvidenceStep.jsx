@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users, CheckCircle, XCircle } from 'lucide-react';
 import { useEvaluation } from '../context/EvaluationContext';
 

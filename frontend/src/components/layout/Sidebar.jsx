@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, FileText, Settings, ChevronLeft, ChevronRight,
+  LayoutDashboard, Users, Settings, ChevronLeft, ChevronRight,
   Briefcase, Moon, Sun, Activity
 } from 'lucide-react';
 import { useTheme } from '../../providers/ThemeProvider';
@@ -19,7 +19,7 @@ const bottomItems = [
 
 export default function Sidebar({ dbStatus = 'Checking...' }) {
   const location = useLocation();
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === 'true';

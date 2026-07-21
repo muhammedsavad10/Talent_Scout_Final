@@ -1,4 +1,3 @@
-import React from 'react';
 import { Mail, RefreshCw } from 'lucide-react';
 import { useEvaluation } from '../context/EvaluationContext';
 import { candidateService } from '../../../services/candidateService';

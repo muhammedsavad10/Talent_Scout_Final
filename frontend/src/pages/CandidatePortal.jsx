@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { 
   Target, Award, BookOpen, CheckCircle, ArrowRight, FileText, Sparkles, HelpCircle, AlertCircle, Play
 } from 'lucide-react';
@@ -65,26 +65,40 @@ You missed: **Qdrant**, **Flask**, and **Agile**.
 };
 
 const CandidatePortal = ({ evaluationData = null, activeRole = 'Candidate' }) => {
-  const [data, setData] = useState(mockEvaluationData);
-  const [isUsingLive, setIsUsingLive] = useState(false);
-
-  useEffect(() => {
+  const [data, setData] = useState(() => {
     if (evaluationData) {
-      setData(evaluationData);
-      setIsUsingLive(true);
-    } else {
+      return evaluationData.rawPayload || evaluationData;
+    }
+    try {
       const stored = localStorage.getItem('lastEvaluation');
       if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          setData(parsed);
-          setIsUsingLive(true);
-        } catch (e) {
-          console.error("Failed to parse cached evaluation from localStorage", e);
-        }
+        const parsed = JSON.parse(stored);
+        return parsed.rawPayload || parsed;
       }
+    } catch (e) {
+      console.error("Failed to parse cached evaluation from localStorage", e);
     }
-  }, [evaluationData]);
+    return mockEvaluationData;
+  });
+
+  const [isUsingLive, setIsUsingLive] = useState(() => {
+    if (evaluationData) return true;
+    try {
+      const stored = localStorage.getItem('lastEvaluation');
+      return !!stored;
+    } catch {
+      return false;
+    }
+  });
+
+  const [prevEvalData, setPrevEvalData] = useState(evaluationData);
+  if (evaluationData !== prevEvalData) {
+    setPrevEvalData(evaluationData);
+    if (evaluationData) {
+      setData(evaluationData.rawPayload || evaluationData);
+      setIsUsingLive(true);
+    }
+  }
 
   const handleClearCache = () => {
     localStorage.removeItem('lastEvaluation');
