@@ -11,24 +11,44 @@ import DecisionStep from '../steps/DecisionStep';
 
 const STEP_REGISTRY = {
   2: {
+    id: 'suitability',
     label: 'Profile Suitability',
-    component: SuitabilityStep
+    component: SuitabilityStep,
+    analyticsKey: 'profile_suitability',
+    allowNext: true,
+    allowBack: true
   },
   3: {
+    id: 'evidence',
     label: 'Factual Evidence',
-    component: EvidenceStep
+    component: EvidenceStep,
+    analyticsKey: 'factual_evidence',
+    allowNext: true,
+    allowBack: true
   },
   4: {
+    id: 'learning',
     label: 'Technical Questions',
-    component: LearningStep
+    component: LearningStep,
+    analyticsKey: 'technical_learning',
+    allowNext: true,
+    allowBack: true
   },
   5: {
+    id: 'communication',
     label: 'Draft Communication',
-    component: CommunicationStep
+    component: CommunicationStep,
+    analyticsKey: 'candidate_communication',
+    allowNext: true,
+    allowBack: true
   },
   6: {
+    id: 'decision',
     label: 'Screening Decision',
-    component: DecisionStep
+    component: DecisionStep,
+    analyticsKey: 'recruiter_decision',
+    allowNext: false,
+    allowBack: true
   }
 };
 
