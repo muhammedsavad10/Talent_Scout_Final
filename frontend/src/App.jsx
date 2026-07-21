@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import CandidatePortal from './pages/CandidatePortal';
 import AppLayout from './components/layout/AppLayout';
-import { checkHealth } from './services/api';
+import { evaluationService } from './services/evaluationService';
 
 function App() {
   const [dbStatus, setDbStatus] = useState('Checking...');
@@ -12,7 +12,7 @@ function App() {
   });
 
   useEffect(() => {
-    checkHealth()
+    evaluationService.checkHealth()
       .then(data => setDbStatus(data.status === 'healthy' ? 'Online' : 'Degraded'))
       .catch(() => setDbStatus('Offline'));
   }, []);
