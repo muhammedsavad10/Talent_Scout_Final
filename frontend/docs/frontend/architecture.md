@@ -53,3 +53,18 @@ src/
 2. **Adapter Purity**: Direct parsing of API response schemas inside components is prohibited. Network responses must pass through `evaluationMapper.js` to return a flat, safe, normalized UI model.
 3. **No Direct Axios Usage in UI**: Components must interact with the network exclusively via service class handlers (e.g., `batchService`, `chatService`).
 4. **State Delegation**: Keep ephemeral presentation states (e.g. active tab selections, dialog triggers) locally inside components. Push shared, domain-wide workflow states into `EvaluationContext`.
+5. **Architectural Purity Rule**: No React component may query, read, or process raw backend payload fields directly. All JSON payloads from backend endpoints must be routed through the normalized adapter layer (`evaluationMapper.js`).
+
+---
+
+## New Feature Development Checklist
+
+Every new application capability or feature module introduced to this project must conform to the following architectural checklist:
+
+* **[ ] Feature encapsulation**: Create a dedicated subdirectory under `src/features/` with isolated visual elements.
+* **[ ] Isolated service**: Build a service handler subclass inside `src/services/` for feature-specific operations. Never call native Axios from component contexts.
+* **[ ] Type Adapter updates**: Update the adapter models inside `evaluationMapper.js` if the backend JSON schema is altered.
+* **[ ] State Action updates**: If shared state is needed, introduce domain-prefixed action definitions (`NEW_FEATURE/`) inside the dashboard reducer context.
+* **[ ] Comprehensive tests**: Implement Vitest tests covering mapping states or component integrations.
+* **[ ] Architecture updates**: Log new services, components, or folders in `docs/frontend/feature-map.md`.
+
