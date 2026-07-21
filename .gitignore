@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Virtual Environments
+venv/
+.venv/
+env/
+backend/venv/
+
+# Node
+node_modules/
+.vite/
+dist/
+build/
+frontend/node_modules/
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.vscode/settings.json
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Playwright
+playwright-report/
+test-results/
+videos/
+screenshots/
+
+# Temporary
+dataset/
+data/
+downloads/
+cache/
+debug/
+profiling/
+benchmark/
+
+# Security
+.env
+backend/.env
+
+# Root level temp files
+implementation_plan.md
+task.md
+walkthrough.md
+rescan_results.json
+.test_files.py
