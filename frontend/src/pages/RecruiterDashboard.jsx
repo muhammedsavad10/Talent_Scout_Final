@@ -13,106 +13,17 @@ import { chatService } from '../services/chatService';
 import UploadWizard from '../features/batch/components/UploadWizard';
 import BatchProgress from '../features/batch/components/BatchProgress';
 import BatchCompleteCard from '../features/batch/components/BatchCompleteCard';
+import DimensionScorePanel from '../features/evaluation/components/DimensionScorePanel';
+import SkillAnalysisCard from '../features/evaluation/components/SkillAnalysisCard';
+import EvaluationWizard from '../features/evaluation/components/EvaluationWizard';
 
 const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
-  // --- Authentication / Authorization State (RBAC) ---
-  // Handled via activeRole prop passed from App.jsx
-
-  // --- Evaluation State ---
-  const [files, setFiles] = useState([]); // Support multiple files
-  const [batchJobs, setBatchJobs] = useState([]); // Track batch upload queue
-  const [jdText, setJdText] = useState('');
-  const [jdSkills, setJdSkills] = useState('');
-  const [evaluationId, setEvaluationId] = useState(null); // Active viewed eval ID
-  const [activeStep, setActiveStep] = useState(1); // 1: Ingest, 1.5: Batch Compare, 2: Suitability, 3: Evidence, 4: Onboarding/Interview, 5: Comm, 6: Finalize
-  const [result, setResult] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
-
-  // Drag & Drop / File selection handlers
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf'));
-      if (droppedFiles.length > 0) {
-        setFiles(prev => [...prev, ...droppedFiles]);
-      }
-    }
-  };
-
-  const handleFileChange = (e) => {
-    if (e.target.files) {
-      const selected = Array.from(e.target.files).filter(f => f.name.endsWith('.pdf'));
-      setFiles(prev => [...prev, ...selected]);
-    }
-  };
-
-  const removeFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // --- Batch Evaluation State ---
-  const [activeBatchId, setActiveBatchId] = useState(null);
-  const [batchStatus, setBatchStatus] = useState(null);
-  const [batchResult, setBatchResult] = useState(null);
-  const [selectedCandidates, setSelectedCandidates] = useState([]);
-  const [showSideBySide, setShowSideBySide] = useState(false);
-  const [filterTier, setFilterTier] = useState('All');
-  const [sortConfig, setSortConfig] = useState({ key: 'rank', direction: 'asc' });
-
-  // --- Candidate Screening Decision State ---
-  const [selectedQuestionsTab, setSelectedQuestionsTab] = useState('easy');
-  const [emailTemplateType, setEmailTemplateType] = useState('interview_invite');
-  const [emailDraft, setEmailDraft] = useState(null);
-  const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
-  const [notesEditable, setNotesEditable] = useState(false);
-  const [editedNotes, setEditedNotes] = useState('');
-  const [overrideDecision, setOverrideDecision] = useState('');
-  const [isSubmittingScreening, setIsSubmittingScreening] = useState(false);
-  const [screeningSuccess, setScreeningSuccess] = useState(false);
-
-  // Accordion toggle state (Skill index to boolean)
-  const [expandedAccordions, setExpandedAccordions] = useState({});
-
-  // --- Stateful Recruiter Assistant State ---
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
-
-  // --- Developer Mode State ---
-  const [devPassword, setDevPassword] = useState('');
-  const [isDevUnlocked, setIsDevUnlocked] = useState(false);
-  const [devError, setDevError] = useState('');
-  const [isDevDrawerOpen, setIsDevDrawerOpen] = useState(false);
-
-  // Reset local state if result changes
-  useEffect(() => {
-    if (result) {
-      setEditedNotes(result.rawPayload?.recruiter?.recruiter_notes || '');
-      setOverrideDecision(result.recommendation?.tier || 'Review Before Interview');
-      setEmailDraft(null);
-      setChatMessages([
-        {
-          role: 'assistant',
-          content: `Hello! I have loaded the evaluation for **${result.filename || 'Candidate'}**. You can ask me questions about their technical skills, projects, or work history, and I will cite evidence directly from their resume.`,
-          citations: []
-        }
-      ]);
-    }
-  }, [result]);
+  const { state, dispatch } = useEvaluation();
+  const {
+    isLoading, error, activeStep, result, batchResult, activeBatchId,
+    batchStatus, selectedCandidates, showSideBySide, filterTier, sortConfig,
+    chatMessages, chatInput, isChatLoading
+  } = state;
 
   // Handle access restrictions for Candidate role on Recruiter Dashboard
   if (activeRole === 'Candidate') {
@@ -140,86 +51,30 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const isInterviewer = activeRole === 'Interviewer';
   const displayStep = isInterviewer ? 4 : activeStep;
 
-  // Submit Handler for asynchronous processing
-  const handleSubmitEvaluation = async (e) => {
-    e.preventDefault();
-    if (files.length === 0) {
-      setError("Please upload at least one candidate PDF resume.");
-      return;
-    }
-    if (!jdText.trim()) {
-      setError("Please provide a Job Description.");
-      return;
-    }
+  // --- Local UI-only states ---
+  const [devPassword, setDevPassword] = useState('');
+  const [isDevUnlocked, setIsDevUnlocked] = useState(false);
+  const [devError, setDevError] = useState('');
+  const [isDevDrawerOpen, setIsDevDrawerOpen] = useState(false);
 
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-    setBatchResult(null);
-    setActiveBatchId(null);
-    setBatchStatus(null);
-    setScreeningSuccess(false);
-    setSelectedCandidates([]);
-    setShowSideBySide(false);
-    setFilterTier('All');
-    setSortConfig({ key: 'rank', direction: 'asc' });
+  // Poll batch status if activeBatchId changes
+  useEffect(() => {
+    if (!activeBatchId) return;
 
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f));
-    formData.append('job_description', jdText);
-    if (jdSkills.trim()) {
-      formData.append('jd_skills', jdSkills);
-    }
-
-    try {
-      if (import.meta.env.DEV) {
-        console.group("🚀 [Upload Request] POST /api/v1/evaluate/batch");
-        console.log("Files:", files.map(f => f.name));
-        console.log("Job Description:", jdText);
-        console.log("JD Skills Overrides:", jdSkills);
-        console.groupEnd();
-      }
-
-      const data = await batchService.batchEvaluate(formData);
-
-      if (import.meta.env.DEV) {
-        console.group("✅ [Upload Response]");
-        console.log(data);
-        console.groupEnd();
-      }
-
-      const bId = data.batch_id;
-      if (bId) {
-        setActiveBatchId(bId);
-        setBatchStatus(data);
-        pollBatchJob(bId);
-      }
-    } catch (err) {
-      console.error("❌ Upload Error:", err);
-      const detail = err.response?.data?.detail || "Batch upload failed.";
-      const errMsg = typeof detail === 'object' ? JSON.stringify(detail) : detail;
-      setError(errMsg);
-    } finally {
-      setIsLoading(false);
-      setFiles([]); // clear input
-    }
-  };
-
-  const pollBatchJob = (bId) => {
     const startTime = Date.now();
     const pollInterval = setInterval(async () => {
       try {
         if (Date.now() - startTime > 30 * 60 * 1000) { // 30 mins max timeout
           clearInterval(pollInterval);
-          setError("Batch Evaluation Timeout.");
+          dispatch({ type: 'SET_ERROR', payload: "Batch Evaluation Timeout." });
           return;
         }
         
-        const data = await batchService.getBatchStatus(bId);
-        setBatchStatus(data);
+        const data = await batchService.getBatchStatus(activeBatchId);
+        dispatch({ type: 'POLL_BATCH_TICK', payload: data });
 
         if (import.meta.env.DEV) {
-          console.group(`🔄 [Polling Response] Batch ID: ${bId}`);
+          console.group(`🔄 [Polling Response] Batch ID: ${activeBatchId}`);
           console.log("Status:", data.status, `(${data.completed}/${data.total} completed)`);
           if (data.results?.ranked_candidates) {
             console.table(data.results.ranked_candidates);
@@ -231,15 +86,15 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
           clearInterval(pollInterval);
           
           if (data.status === 'FAILED') {
-            setError(data.error || "Batch processing failed.");
+            dispatch({ type: 'SET_ERROR', payload: data.error || "Batch processing failed." });
             return;
           }
           
-          setBatchResult(data.results);
+          dispatch({ type: 'POLL_BATCH_SUCCESS', payload: data.results });
           if (data.status === 'COMPLETED_WITH_ERRORS') {
-            setError("Batch completed but some post-processing errors occurred.");
+            dispatch({ type: 'SET_ERROR', payload: "Batch completed but some post-processing errors occurred." });
           } else if (data.failed > 0 && data.completed === 0) {
-            setError("All evaluations failed in the batch.");
+            dispatch({ type: 'SET_ERROR', payload: "All evaluations failed in the batch." });
           } else if (data.results?.ranked_candidates?.length >= 1) {
             // Auto-load top candidate result
             handleViewResult(data.results.ranked_candidates[0]);
@@ -248,15 +103,17 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
       } catch (err) {
         if (err.response && err.response.status === 404) {
           clearInterval(pollInterval);
-          setError("Batch not found.");
+          dispatch({ type: 'SET_ERROR', payload: "Batch not found." });
         }
       }
     }, 2000);
-  };
+
+    return () => clearInterval(pollInterval);
+  }, [activeBatchId]);
 
   const handleViewResult = async (candRow) => {
-    setIsLoading(true);
-    setError(null);
+    dispatch({ type: 'START_LOADING' });
+    dispatch({ type: 'CLEAR_ERROR' });
     try {
       if (import.meta.env.DEV) {
         console.group(`📋 [Evaluation Response] GET /api/v1/evaluation/status/${candRow.evaluation_id}`);
@@ -288,67 +145,31 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
           console.groupEnd();
         }
 
-        setResult(mapped);
-        setEvaluationId(candRow.evaluation_id);
+        dispatch({ type: 'LOAD_RESULT_SUCCESS', payload: { mapped, evaluationId: candRow.evaluation_id } });
         localStorage.setItem('lastEvaluation', JSON.stringify(mapped));
-        setActiveStep(2);
       } else {
-        setError(`Cannot view result: evaluation status is ${data?.status} or result is missing`);
+        dispatch({ type: 'SET_ERROR', payload: `Cannot view result: evaluation status is ${data?.status} or result is missing` });
       }
     } catch (err) {
-      setError("Failed to fetch full evaluation payload.");
+      dispatch({ type: 'SET_ERROR', payload: "Failed to fetch full evaluation payload." });
       console.error("❌ Evaluation Fetch Error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const handleBackToComparison = () => {
-    setResult(null);
-    setEvaluationId(null);
-    setActiveStep(1.5);
-  };
-
-  // On-demand Email Generator trigger
-  const handleGenerateEmail = async () => {
-    if (!result) return;
-    setIsGeneratingEmail(true);
-    try {
-      const payload = {
-        filename: result.filename,
-        template_type: emailTemplateType,
-        hiring_recommendation: result.recommendation?.hiring_recommendation || 'Review Before Interview',
-        candidate_summary: result.recommendation?.candidate_summary || [],
-        strengths: result.recommendation?.candidate_highlights || [],
-        missing_skills: result.evidence?.skills_evidence?.filter(s => s.status.toLowerCase().includes("not")).map(s => s.skill) || [],
-        custom_recruiter_notes: editedNotes
-      };
-      
-      const data = await candidateService.generateCommunicationEmail(payload);
-      setEmailDraft(data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate communication draft.");
-    } finally {
-      setIsGeneratingEmail(false);
     }
   };
 
-  // Conversational Assistant submission
   const handleAskAssistant = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || !result) return;
 
     const userQuestion = chatInput.trim();
-    setChatInput('');
+    dispatch({ type: 'SET_CHAT_INPUT', payload: '' });
     
     // Add user message to state
-    const updatedHistory = [...chatMessages, { role: 'user', content: userQuestion }];
-    setChatMessages(updatedHistory);
-    setIsChatLoading(true);
+    dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'user', content: userQuestion } });
+    dispatch({ type: 'START_CHAT_LOADING' });
 
     try {
-      const historyPayload = updatedHistory.slice(1, -1).map(msg => ({
+      // Build history payload for assistant context
+      const historyPayload = [...chatMessages].map(msg => ({
         role: msg.role,
         content: msg.content
       }));
@@ -361,24 +182,23 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
       };
 
       const data = await chatService.askAssistant(payload);
-      setChatMessages(prev => [...prev, {
+      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: {
         role: 'assistant',
         content: data.answer,
         citations: data.citations || []
-      }]);
+      }});
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, {
+      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: {
         role: 'assistant',
         content: "I'm sorry, I couldn't reach the backend to answer your question.",
         citations: []
-      }]);
+      }});
     } finally {
-      setIsChatLoading(false);
+      dispatch({ type: 'STOP_CHAT_LOADING' });
     }
   };
 
-  // Developer Mode password unlock
   const handleUnlockDevMode = async (e) => {
     e.preventDefault();
     setDevError('');
@@ -393,68 +213,16 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     }
   };
 
-  // Submit Final Screening Decision (Step 6)
-  const handleSubmitScreening = async () => {
-    setIsSubmittingScreening(true);
-    // Simulate database write
-    setTimeout(() => {
-      setIsSubmittingScreening(false);
-      setScreeningSuccess(true);
-      // Reset result and return to Step 1
-      setTimeout(() => {
-        setResult(null);
-        setEvaluationId(null);
-        setFile(null);
-        setActiveStep(1);
-        setScreeningSuccess(false);
-      }, 3000);
-    }, 1500);
-  };
-
-  // Helper to toggle accordions
-  const toggleAccordion = (index) => {
-    setExpandedAccordions(prev => ({
-      ...prev,
-      [index]: !prev[index]
-    }));
-  };
-
-  // Safe color maps for hiring recommendations
-  const getRecommendationStyle = (rec) => {
-    const r = (rec || '').toLowerCase();
-    if (r.includes('recommended')) return { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-500 text-white' };
-    if (r.includes('review') || r.includes('backup')) return { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', badge: 'bg-amber-500 text-white' };
-    return { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-700', badge: 'bg-rose-500 text-white' };
-  };
-
-  // Check step lock status (Steps 2-6 require an evaluation payload)
-  const isStepLocked = (stepNum) => {
-    return !result && stepNum > 1;
-  };
-
-  // Filter Steps based on role limits
-  // Hiring Manager hides Ingest (1) and Comms (5)
-  // Interviewer hides all except Decide (4)
-  const isStepVisible = (stepNum) => {
-    if (isInterviewer) return stepNum === 4;
-    if (activeRole === 'Hiring Manager') return stepNum !== 1 && stepNum !== 5;
-    return true;
-  };
-
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
-    setSortConfig({ key, direction });
+    dispatch({ type: 'SET_SORT_CONFIG', payload: { key, direction } });
   };
 
   const toggleCandidateSelection = (evalId) => {
-    setSelectedCandidates(prev => 
-      prev.includes(evalId) 
-        ? prev.filter(id => id !== evalId)
-        : prev.length < 4 ? [...prev, evalId] : prev
-    );
+    dispatch({ type: 'SELECT_CANDIDATE', payload: evalId });
   };
 
   const getSortedFilteredCandidates = () => {
@@ -462,18 +230,15 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     
     let filtered = [...batchResult.ranked_candidates];
     
-    // Filter
     if (filterTier !== 'All') {
       filtered = filtered.filter(c => c.recommendation_tier === filterTier);
     }
     
-    // Sort
-    if (sortConfig.key !== 'rank') { // Default 'rank' is just the array order from backend
+    if (sortConfig.key !== 'rank') {
       filtered.sort((a, b) => {
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
         
-        // Handle policy eligibility string sorting visually
         if (sortConfig.key === 'policy_eligible') {
           aVal = a.policy_eligible ? 1 : 0;
           bVal = b.policy_eligible ? 1 : 0;
@@ -488,15 +253,6 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
     return filtered;
   };
 
-  const stepsList = [
-    { num: 1, label: 'Ingest Resume' },
-    { num: 2, label: 'Understand Profile' },
-    { num: 3, label: 'Verify Evidence' },
-    { num: 4, label: 'Decide Interview' },
-    { num: 5, label: 'Generate Comms' },
-    { num: 6, label: 'Complete Screening' }
-  ];
-
   return (
     <div className="relative space-y-6">
       
@@ -508,83 +264,6 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
         </div>
       </div>
       
-      {/* 6-Step Progressive Workflow Sticky Navigation */}
-      {!isInterviewer && (
-        <div className="sticky top-16 bg-white/95 backdrop-blur border-b border-slate-200 z-40 py-3.5 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto scrollbar-none space-x-4">
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              {stepsList.map((step) => {
-                const isVisible = isStepVisible(step.num);
-                if (!isVisible) return null;
-                const locked = isStepLocked(step.num);
-                const active = displayStep === step.num;
-                const completed = result && displayStep > step.num;
-
-                return (
-                  <button
-                    key={step.num}
-                    disabled={locked}
-                    onClick={() => setActiveStep(step.num)}
-                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                      active 
-                        ? 'bg-indigo-50 text-indigo-700 ring-2 ring-indigo-600/20' 
-                        : completed
-                          ? 'text-indigo-600 hover:bg-slate-50'
-                          : locked
-                            ? 'text-slate-300 cursor-not-allowed'
-                            : 'text-slate-500 hover:text-indigo-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center border font-sans ${
-                      completed 
-                        ? 'bg-indigo-600 border-indigo-600 text-white' 
-                        : active 
-                          ? 'border-indigo-600 text-indigo-600 bg-white' 
-                          : 'border-slate-300 text-slate-400'
-                    }`}>
-                      {completed ? <Check className="w-3 h-3" /> : step.num}
-                    </span>
-                    <span className="hidden lg:inline">{step.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Next / Back Step Controls */}
-            {result && (
-              <div className="flex space-x-2">
-                <button
-                  disabled={displayStep === 1 || (activeRole === 'Hiring Manager' && displayStep === 2)}
-                  onClick={() => {
-                    let prevStep = displayStep - 1;
-                    while (prevStep >= 1 && !isStepVisible(prevStep)) {
-                      prevStep--;
-                    }
-                    setActiveStep(prevStep);
-                  }}
-                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  disabled={displayStep === 6}
-                  onClick={() => {
-                    let nextStep = displayStep + 1;
-                    while (nextStep <= 6 && !isStepVisible(nextStep)) {
-                      nextStep++;
-                    }
-                    setActiveStep(nextStep);
-                  }}
-                  className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Main Workspace Layout (Workflow Left, Assistant Chat Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -620,7 +299,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                 <div className="space-y-6">
                   <UploadWizard />
                   <BatchProgress />
-                  <BatchCompleteCard onViewComparison={() => setActiveStep(1.5)} />
+                  <BatchCompleteCard onViewComparison={() => dispatch({ type: 'SET_STEP', payload: 1.5 })} />
                 </div>
               )}
 
@@ -628,11 +307,11 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
               {displayStep === 1.5 && batchResult && (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-800">Candidate Comparison</h2>
+                    <h2 className="text-xl font-bold text-slate-800 font-sans">Candidate Comparison</h2>
                     <div className="flex space-x-3">
                       <select 
                         value={filterTier}
-                        onChange={(e) => setFilterTier(e.target.value)}
+                        onChange={(e) => dispatch({ type: 'SET_FILTER_TIER', payload: e.target.value })}
                         className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="All">All Tiers</option>
@@ -643,7 +322,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                       </select>
                       
                       <button 
-                        onClick={() => setShowSideBySide(true)}
+                        onClick={() => dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: true })}
                         disabled={selectedCandidates.length < 2 || selectedCandidates.length > 4}
                         className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-bold rounded-lg transition"
                       >
@@ -740,7 +419,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                       <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                           <h2 className="text-lg font-bold text-slate-800 flex items-center"><Users className="w-5 h-5 mr-2 text-indigo-600" /> Side-by-Side Comparison</h2>
-                          <button onClick={() => setShowSideBySide(false)} className="p-2 hover:bg-slate-200 rounded-lg"><XCircle className="w-5 h-5 text-slate-500" /></button>
+                          <button onClick={() => dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: false })} className="p-2 hover:bg-slate-200 rounded-lg"><XCircle className="w-5 h-5 text-slate-500" /></button>
                         </div>
                         
                         <div className="p-6 overflow-auto flex-1">
@@ -791,7 +470,7 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                                     </div>
                                     <div className="pt-4 border-t border-slate-100 text-center">
                                       <button 
-                                        onClick={() => { setShowSideBySide(false); handleViewResult(cand); }}
+                                        onClick={() => { dispatch({ type: 'TOGGLE_SIDE_BY_SIDE', payload: false }); handleViewResult(cand); }}
                                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
                                       >
                                         View Full Evaluation
@@ -806,616 +485,10 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
                       </div>
                     </div>
                   )}
-                </div>
+              {/* STEPS 2-6: EVALUATION SUITE */}
+              {displayStep >= 2 && result && (
+                <EvaluationWizard />
               )}
-
-              {/* STEP 2: UNDERSTAND CANDIDATE */}
-              {displayStep === 2 && result && (
-                <div className="space-y-6">
-                  
-                  {batchResult && (
-                    <div className="flex items-center pb-2">
-                      <button 
-                        onClick={() => handleBackToComparison()}
-                        className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span>Back to Batch Comparison</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Decision Engine Dimension Scores */}
-                  {result.dimensionScores && result.dimensionScores.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {result.dimensionScores.map(dim => (
-                        <div key={dim.key} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm text-center space-y-1 hover:border-indigo-300 transition-colors cursor-default" title={dim.evidence?.join('\n')}>
-                          <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block truncate">{getDimensionLabel(dim.key)}</span>
-                          <span className="text-2xl sm:text-3xl font-black text-indigo-600 font-sans">
-                            {dim.score}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-bold tracking-wider block">CONF: {dim.confidence}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {/* Skills Alignment Badges */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Matched Skills ({(result.evidenceStates?.matched || []).length})
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {(result.evidenceStates?.matched || []).map((skill, idx) => (
-                          <span key={idx} className="px-2.5 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">
-                            {skill}
-                          </span>
-                        ))}
-                        {(result.evidenceStates?.matched || []).length === 0 && (
-                          <p className="text-xs text-slate-400 italic">No skills matched.</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Missing Skills ({(result.evidenceStates?.missing || []).length})
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {(result.evidenceStates?.missing || []).map((skill, idx) => (
-                          <span key={idx} className="px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-lg">
-                            {skill}
-                          </span>
-                        ))}
-                        {(result.evidenceStates?.missing || []).length === 0 && (
-                          <p className="text-xs text-slate-400 italic font-semibold">All required skills identified!</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Structured Recommendation Basis & Executive Summary */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 space-y-3 sm:space-y-0">
-                      <div className="flex items-center space-x-2">
-                        <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                          <Users className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-lg font-bold text-slate-800">2. Profile Suitability Overview</h2>
-                      </div>
-                      
-                      {/* Classification Badge */}
-                      <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide border uppercase shadow-sm ${
-                        getRecommendationStyle(result.recommendation?.tier).bg
-                      } ${
-                        getRecommendationStyle(result.recommendation?.tier).text
-                      }`}>
-                        {result.recommendation?.tier}
-                      </span>
-                    </div>
-
-                    {/* Recommendation Basis (Direct from Decision Engine) */}
-                    <div className="space-y-6 pt-2">
-                      {result.recommendation?.reasoning && (
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3">
-                          <h3 className="text-sm font-bold text-slate-800">Decision Reasoning</h3>
-                          <p className="text-sm text-slate-600 leading-relaxed">{result.recommendation.reasoning}</p>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Strengths */}
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-bold text-emerald-600 uppercase tracking-wider flex items-center"><CheckCircle className="w-4 h-4 mr-1.5" /> Strengths</h3>
-                          <ul className="space-y-2">
-                            {(result.recommendation?.strengths || []).map((bullet, idx) => (
-                              <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0 mt-2" />
-                                <span>{bullet}</span>
-                              </li>
-                            ))}
-                            {(result.recommendation?.strengths || []).length === 0 && (
-                              <p className="text-xs text-slate-400 italic">None reported.</p>
-                            )}
-                          </ul>
-                        </div>
-
-                        {/* Weaknesses */}
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-bold text-amber-600 uppercase tracking-wider flex items-center"><AlertCircle className="w-4 h-4 mr-1.5" /> Weaknesses / Policy Flags</h3>
-                          <ul className="space-y-2">
-                            {(result.recommendation?.weaknesses?.length > 0 ? result.recommendation.weaknesses : result.policyFlags || []).map((bullet, idx) => (
-                              <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0 mt-2" />
-                                <span>{bullet}</span>
-                              </li>
-                            ))}
-                            {(result.recommendation?.weaknesses?.length === 0 && (result.policyFlags || []).length === 0) && (
-                              <p className="text-xs text-slate-400 italic">No policy flags triggered.</p>
-                            )}
-                          </ul>
-                        </div>
-
-                        {/* Critical Missing */}
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-bold text-rose-600 uppercase tracking-wider flex items-center"><XCircle className="w-4 h-4 mr-1.5" /> Critical Missing</h3>
-                          <ul className="space-y-2">
-                            {(result.recommendation?.criticalMissingSkills?.length > 0 ? result.recommendation.criticalMissingSkills : result.evidenceStates?.missing || []).map((skill, idx) => (
-                              <li key={idx} className="flex items-start space-x-2.5 text-sm text-slate-600">
-                                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full flex-shrink-0 mt-2" />
-                                <span>{skill}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Career Timeline */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">{result.evidence?.timeline_title || "Chronological Career Milestones"}</h3>
-                    <div className="relative border-l-2 border-slate-200 pl-6 space-y-8 ml-2">
-                      {result.evidence?.career_timeline?.map((item, idx) => (
-                        <div key={idx} className="relative">
-                          <span className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center">
-                            <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />
-                          </span>
-                          {item.year && (
-                            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-0.5">{item.year}</span>
-                          )}
-                          <h4 className={`text-sm font-bold text-slate-800 ${item.year ? 'mt-2' : ''}`}>{item.role}</h4>
-                          <p className="text-xs text-slate-500 font-semibold">{item.company}</p>
-                          <p className="text-xs text-slate-600 mt-1">{item.details}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Disclaimer */}
-                  <p className="text-center text-[10px] text-slate-400 italic font-medium px-4">
-                    {result.recommendation?.disclaimer}
-                  </p>
-                </div>
-              )}
-
-              {/* STEP 3: VERIFY EVIDENCE */}
-              {displayStep === 3 && result && (
-                <div className="space-y-6">
-                  
-                  {/* Factual Evidence Audit */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div className="flex items-center space-x-2">
-                      <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <h2 className="text-lg font-bold text-slate-800">3. Factual Evidence Audit</h2>
-                    </div>
-
-                    {result.skillsEvidence && result.skillsEvidence.length > 0 ? (
-                      <div className="space-y-3">
-                        {result.skillsEvidence.map((item, idx) => {
-                          const isIdentified = item.status?.toLowerCase().includes("identified") && !item.status?.toLowerCase().includes("not");
-                          const isOpen = !!expandedAccordions[idx];
-
-                          return (
-                            <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                              <button
-                                onClick={() => toggleAccordion(idx)}
-                                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition text-left"
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <span className="text-sm font-bold text-slate-800">{item.skill}</span>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                    isIdentified ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-rose-50 border border-rose-200 text-rose-700'
-                                  }`}>
-                                    {isIdentified ? 'Identified' : 'Not identified'}
-                                  </span>
-                                </div>
-                                <span className="text-xs font-bold text-slate-400 hover:text-slate-600">
-                                  {isOpen ? 'Collapse' : 'Expand'}
-                                </span>
-                              </button>
-
-                              {isOpen && (
-                                <div className="p-4 bg-slate-50/50 border-t border-slate-100 text-xs text-slate-600 space-y-3">
-                                  {item.evidence_snippet && (
-                                    <div className="bg-white border border-slate-200 rounded-lg p-3 italic text-slate-700">
-                                      "{item.evidence_snippet}"
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      /* Direct evidenceStates display from backend (NO synthetic text) */
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                          <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center">
-                            <CheckCircle className="w-4 h-4 mr-1.5" /> Identified / Matched Skills ({result.evidenceStates?.matched?.length || 0})
-                          </h3>
-                          <ul className="space-y-1.5">
-                            {(result.evidenceStates?.matched || []).map((skill, idx) => (
-                              <li key={idx} className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span>{skill}</span>
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase">Verified</span>
-                              </li>
-                            ))}
-                            {(result.evidenceStates?.matched || []).length === 0 && (
-                              <p className="text-xs text-slate-400 italic">No skills matched.</p>
-                            )}
-                          </ul>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
-                          <h3 className="text-xs font-bold text-rose-700 uppercase tracking-wider flex items-center">
-                            <XCircle className="w-4 h-4 mr-1.5" /> Missing Skills ({result.evidenceStates?.missing?.length || 0})
-                          </h3>
-                          <ul className="space-y-1.5">
-                            {(result.evidenceStates?.missing || []).map((skill, idx) => (
-                              <li key={idx} className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between">
-                                <span>{skill}</span>
-                                <span className="text-[10px] font-bold text-rose-600 uppercase">Not Found</span>
-                              </li>
-                            ))}
-                            {(result.evidenceStates?.missing || []).length === 0 && (
-                              <p className="text-xs text-slate-400 italic font-semibold">All required skills identified!</p>
-                            )}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Business Impact Metrics */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Extracted Business Impact & Quantifiable Outcomes</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {result.evidence?.business_impact?.map((item, idx) => (
-                        <div key={idx} className="bg-indigo-50/30 border border-indigo-100 rounded-xl p-4 flex items-start space-x-3 shadow-sm">
-                          <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full flex-shrink-0 mt-1.5" />
-                          <div>
-                            <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wide bg-indigo-50 px-2 py-0.5 rounded border border-indigo-150">{item.category}</span>
-                            <p className="text-sm text-slate-700 mt-2 font-medium">{item.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {(!result.evidence?.business_impact || result.evidence.business_impact.length === 0) && (
-                        <p className="text-xs text-slate-400 italic col-span-2">No business impact or quantitative achievements could be extracted from the resume.</p>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* STEP 4: DECIDE INTERVIEW */}
-              {displayStep === 4 && result && (
-                <div className="space-y-6">
-                  
-                  {/* Onboarding & Ramp-up (Hides for Interviewer role) */}
-                  {!isInterviewer && (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                      <div className="flex items-center space-x-2">
-                        <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                          <Clock className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-lg font-bold text-slate-800">4. Onboarding & Learning Strategy</h2>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                        <div className="bg-indigo-950 text-white rounded-xl p-5 shadow flex flex-col justify-between md:col-span-1">
-                          <div>
-                            <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">Estimated Ramp-Up</span>
-                            <h3 className="text-3xl font-black mt-2 text-white">{result.onboarding?.estimated_ramp_up}</h3>
-                          </div>
-                          <p className="text-[10px] text-indigo-300/80 leading-snug mt-6">Timeline to achieve standalone contribution eligibility.</p>
-                        </div>
-                        
-                        <div className="md:col-span-2 space-y-3">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Upskilling Justification Factors</span>
-                          <ul className="space-y-2">
-                            {result.onboarding?.rationale_factors?.map((factor, idx) => (
-                              <li key={idx} className="flex items-start space-x-2 text-xs text-slate-600 font-semibold bg-slate-50 border border-slate-100 rounded-lg p-2.5">
-                                <span className="text-indigo-600 font-black">✔</span>
-                                <span>{factor}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Learnability Curves / Transition Matrix */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Learnability Transition Matrix (Adjacent Technology Mappings)</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left text-slate-500 border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px] bg-slate-50/50">
-                            <th className="py-3 px-4">Requirement</th>
-                            <th className="py-3 px-4">Estimated Difficulty</th>
-                            <th className="py-3 px-4">Transition Path / Rationale</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {result.onboarding?.learning_curve?.map((item, idx) => (
-                            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/30">
-                              <td className="py-3 px-4 font-bold text-slate-700">{item.skill}</td>
-                              <td className="py-3 px-4">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  item.difficulty.toLowerCase().includes('easy') 
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                                    : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                }`}>
-                                  {item.difficulty}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-slate-600">{item.reason}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Graded Interview prep questions checklist */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                    <div className="flex items-center justify-between pb-4 border-b border-slate-150">
-                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Difficulty-Graded Technical Question Checklist</h3>
-                      
-                      {/* Tabs */}
-                      <div className="flex space-x-1 bg-slate-100 rounded-lg p-1 border border-slate-200">
-                        {['easy', 'medium', 'advanced'].map((tab) => (
-                          <button
-                            key={tab}
-                            onClick={() => setSelectedQuestionsTab(tab)}
-                            className={`px-3 py-1 text-xs font-bold rounded-md capitalize transition ${
-                              selectedQuestionsTab === tab 
-                                ? 'bg-white text-indigo-700 shadow-sm' 
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            {tab}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Interview Verification prep focus areas */}
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs space-y-2">
-                      <span className="font-bold text-slate-500 uppercase tracking-wider block text-[10px]">Verification Target Focus Areas</span>
-                      <ul className="list-disc pl-4 space-y-1.5 text-slate-600 font-semibold">
-                        {result.interview?.verify_during_interview?.map((area, idx) => (
-                          <li key={idx}>{area}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Graded Question lists */}
-                    <div className="space-y-3 pt-2">
-                      {result.interview?.interview_questions?.[selectedQuestionsTab]?.map((q, idx) => (
-                        <div key={idx} className="flex items-start space-x-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
-                          <input
-                            type="checkbox"
-                            id={`q-${selectedQuestionsTab}-${idx}`}
-                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 mt-0.5"
-                          />
-                          <label htmlFor={`q-${selectedQuestionsTab}-${idx}`} className="text-xs font-medium text-slate-700 cursor-pointer">
-                            {q}
-                          </label>
-                        </div>
-                      ))}
-                      {(!result.interview?.interview_questions?.[selectedQuestionsTab] || result.interview.interview_questions[selectedQuestionsTab].length === 0) && (
-                        <p className="text-xs text-slate-400 italic">No questions generated for this difficulty category.</p>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* STEP 5: GENERATE COMMUNICATIONS */}
-              {displayStep === 5 && result && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                      <Mail className="w-5 h-5" />
-                    </div>
-                    <h2 className="text-lg font-bold text-slate-800">5. On-Demand Candidate Communications Generator</h2>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
-                    <div className="space-y-2 col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Select Communication Template</label>
-                      <select
-                        value={emailTemplateType}
-                        onChange={(e) => setEmailTemplateType(e.target.value)}
-                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition text-slate-700 bg-slate-50/50 text-sm font-semibold"
-                      >
-                        <option value="interview_invite">Interview Invitation Email</option>
-                        <option value="shortlisted">Shortlist Notification Email</option>
-                        <option value="rejection">Polite & Encouraging Rejection Email</option>
-                        <option value="candidate_feedback">Comprehensive Upskilling Growth Plan</option>
-                      </select>
-                    </div>
-
-                    <div className="pt-6 col-span-1">
-                      <button
-                        onClick={handleGenerateEmail}
-                        disabled={isGeneratingEmail}
-                        className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all text-xs"
-                      >
-                        {isGeneratingEmail ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Drafting...</span>
-                          </>
-                        ) : (
-                          <span>Generate Communication</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Generated Email Editor */}
-                  {emailDraft && (
-                    <div className="border border-slate-200 rounded-2xl p-5 space-y-4 bg-slate-50/40 shadow-inner mt-6 animate-fadeIn">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Subject</span>
-                        <input
-                          type="text"
-                          value={emailDraft.subject}
-                          onChange={(e) => setEmailDraft({ ...emailDraft, subject: e.target.value })}
-                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 bg-white"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Draft Body</span>
-                        <textarea
-                          rows={12}
-                          value={emailDraft.body}
-                          onChange={(e) => setEmailDraft({ ...emailDraft, body: e.target.value })}
-                          className="w-full p-3 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white"
-                        />
-                      </div>
-                      
-                      <div className="flex justify-end pt-2">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(`Subject: ${emailDraft.subject}\n\n${emailDraft.body}`);
-                            alert("Copied to clipboard!");
-                          }}
-                          className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600 transition"
-                        >
-                          Copy Complete Message
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 6: COMPLETE SCREENING */}
-              {displayStep === 6 && result && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                      <CheckCircle className="w-5 h-5" />
-                    </div>
-                    <h2 className="text-lg font-bold text-slate-800">6. Finalize Screening Evaluation & Decisions</h2>
-                  </div>
-
-                  {/* Override Status Button matrix */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Hiring Status Override Decision</label>
-                    <div className="grid grid-cols-3 gap-4">
-                      {['Shortlist', 'Hold', 'Reject'].map((opt) => {
-                        const active = overrideDecision.toLowerCase().includes(opt.toLowerCase());
-                        
-                        return (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => setOverrideDecision(opt)}
-                            className={`p-4 border rounded-xl text-sm font-bold shadow-sm transition flex flex-col items-center space-y-2 ${
-                              active
-                                ? opt === 'Shortlist' 
-                                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-extrabold ring-2 ring-emerald-500/20'
-                                  : opt === 'Hold'
-                                    ? 'bg-amber-50 border-amber-500 text-amber-800 font-extrabold ring-2 ring-amber-500/20'
-                                    : 'bg-rose-50 border-rose-500 text-rose-800 font-extrabold ring-2 ring-rose-500/20'
-                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-                            }`}
-                          >
-                            <span>{opt}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Actionable Resume Improvement list */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs space-y-3">
-                    <span className="font-bold text-slate-500 uppercase tracking-wider block text-[10px]">Resume Checklist Audits</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {result.recruiter?.resume_feedback?.map((fb, idx) => (
-                        <div key={idx} className="flex items-center space-x-2">
-                          {fb.status === 'pass' ? (
-                            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                          )}
-                          <span className="text-slate-600 font-semibold">{fb.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recruiter Notes Editor */}
-                  <div className="space-y-2 border-t border-slate-100 pt-5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Recruiter Notes</label>
-                      <button
-                        type="button"
-                        onClick={() => setNotesEditable(!notesEditable)}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1"
-                      >
-                        {notesEditable ? (
-                          <>
-                            <Save className="w-3 h-3" />
-                            <span>Lock Notes</span>
-                          </>
-                        ) : (
-                          <>
-                            <Edit2 className="w-3 h-3" />
-                            <span>Edit Notes</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <textarea
-                      rows={5}
-                      readOnly={!notesEditable}
-                      value={editedNotes}
-                      onChange={(e) => setEditedNotes(e.target.value)}
-                      className={`w-full p-3 border rounded-xl focus:outline-none transition text-xs font-medium text-slate-700 ${
-                        notesEditable 
-                          ? 'border-indigo-400 bg-white ring-2 ring-indigo-500/10 focus:ring-2 focus:ring-indigo-500' 
-                          : 'border-slate-200 bg-slate-50/50 cursor-not-allowed'
-                      }`}
-                      placeholder="Add recruiter notes and manual feedback details here..."
-                    />
-                  </div>
-
-                  {/* Submit decision */}
-                  <button
-                    onClick={handleSubmitScreening}
-                    disabled={isSubmittingScreening}
-                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all mt-4"
-                  >
-                    {isSubmittingScreening ? (
-                      <>
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                        <span>Logging Decision...</span>
-                      </>
-                    ) : (
-                      <span>Submit Final Screening Decision</span>
-                    )}
-                  </button>
-
-                  {screeningSuccess && (
-                    <div className="flex items-center justify-center space-x-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-bold animate-pulse text-center">
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      <span>Screening logged successfully! Returning to Ingest screen...</span>
-                    </div>
-                  )}
-
                 </div>
               )}
             </>
