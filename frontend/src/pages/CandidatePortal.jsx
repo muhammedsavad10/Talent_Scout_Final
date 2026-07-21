@@ -7,16 +7,25 @@ import { mapEvaluationResponse } from '../services/evaluationMapper';
 const mockEvaluationData = {
   status: "success",
   filename: "muhammed_savad_ds_resume.pdf",
-  evaluation: {
-    semantic_match_score: 0.715,
-    explicit_xAI_metrics: {
-      jaccard_score: 0.8684,
-      weighted_score: 0.815,
-      matched_skills: [
+  overall_score: 82,
+  decision_engine: {
+    overall_score: 82,
+    evidence_states: {
+      MATCHED: [
         "Python", "Machine Learning", "SQL", "Docker", "AWS", "PyTorch", 
         "TensorFlow", "FastAPI", "Pandas", "NumPy", "Git"
       ],
-      missing_skills: ["Qdrant", "Flask", "Agile"]
+      MISSING: ["Qdrant", "Flask", "Agile"],
+      INFERRED: [],
+      CONTRADICTED: []
+    },
+    recommendation: {
+      hiring_recommendation: "Interview Candidate",
+      recommendation_basis: {
+        strengths: ["Strong ML & Deep Learning experience", "FastAPI microservices background"],
+        weaknesses: ["Missing Qdrant vector database experience"],
+        critical_missing_skills: ["Qdrant"]
+      }
     }
   },
   onboarding: {

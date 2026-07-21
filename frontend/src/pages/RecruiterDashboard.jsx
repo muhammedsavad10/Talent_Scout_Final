@@ -24,6 +24,41 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Drag & Drop / File selection handlers
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf'));
+      if (droppedFiles.length > 0) {
+        setFiles(prev => [...prev, ...droppedFiles]);
+      }
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      const selected = Array.from(e.target.files).filter(f => f.name.endsWith('.pdf'));
+      setFiles(prev => [...prev, ...selected]);
+    }
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   // --- Batch Evaluation State ---
   const [activeBatchId, setActiveBatchId] = useState(null);
@@ -100,48 +135,6 @@ const RecruiterDashboard = ({ activeRole = 'Recruiter' }) => {
   // Handle Interviewer layout locks (Lock to Step 4: Decide Interview)
   const isInterviewer = activeRole === 'Interviewer';
   const displayStep = isInterviewer ? 4 : activeStep;
-
-  // File drag & drop handlers
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type === "application/pdf");
-      if (droppedFiles.length > 0) {
-        setFiles(prev => [...prev, ...droppedFiles]);
-        setError(null);
-      } else {
-        setError("Only PDF files are supported.");
-      }
-    }
-  };
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFiles = Array.from(e.target.files).filter(f => f.type === "application/pdf");
-      if (selectedFiles.length > 0) {
-        setFiles(prev => [...prev, ...selectedFiles]);
-        setError(null);
-      } else {
-        setError("Only PDF files are supported.");
-      }
-    }
-  };
-
-  const removeFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
 
   // Submit Handler for asynchronous processing
   const handleSubmitEvaluation = async (e) => {
