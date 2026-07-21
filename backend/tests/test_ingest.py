@@ -65,7 +65,6 @@ def test_extract_text_from_pdf_exceeds_page_limit(mock_pdf_reader):
     with pytest.raises(ValueError, match="PDF exceeds the 10-page limit."):
         extract_text_from_pdf(b"dummy pdf bytes")
 
-@pytest.mark.skip(reason="Ingestion pipeline stubbed for C4B")
 def test_parse_resume_to_json_success(mock_llm):
     """Test parse_resume_to_json with valid LLM output matching the schema."""
     # Mock LLM response string
@@ -77,7 +76,6 @@ def test_parse_resume_to_json_success(mock_llm):
     assert set(s.lower() for s in result["hard_skills"]) == {"python", "fastapi"}
     assert result["raw_resume_text"] == "SKILLS\nProficient in Python and FastAPI"
 
-@pytest.mark.skip(reason="Ingestion pipeline stubbed for C4B")
 def test_parse_resume_to_json_structured(mock_llm):
     """Test parse_resume_to_json with structured and extensible skills in LLM output."""
     content_json = """
@@ -98,7 +96,6 @@ def test_parse_resume_to_json_structured(mock_llm):
     assert "go" in [s.lower() for s in result.get("hard_skills", [])]
     assert "aws" in [s.lower() for s in result.get("hard_skills", [])]
 
-@pytest.mark.skip(reason="Ingestion pipeline stubbed for C4B")
 def test_parse_resume_to_json_validation_failure(mock_llm):
     """Test parse_resume_to_json raises exception on invalid schema response from LLM."""
     # Missing education field
@@ -109,7 +106,6 @@ def test_parse_resume_to_json_validation_failure(mock_llm):
     assert result["education"] == []
 
 
-@pytest.mark.skip(reason="Ingestion pipeline stubbed for C4B")
 def test_upload_endpoint_success(mocker, mock_llm, mock_pdf_reader):
     """Test upload endpoint returns correctly parsed structured JSON and saves to DB."""
     # Mock text extraction
@@ -143,7 +139,6 @@ def test_upload_endpoint_success(mocker, mock_llm, mock_pdf_reader):
     mock_supabase.table.assert_called_once_with("candidates")
     mock_supabase.table.return_value.insert.assert_called_once()
 
-@pytest.mark.skip(reason="Ingestion pipeline stubbed for C4B")
 def test_upload_endpoint_db_failure(mocker, mock_llm, mock_pdf_reader):
     """Test upload endpoint returns success_but_db_failed when database saving fails."""
     # Mock text extraction

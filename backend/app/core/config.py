@@ -44,12 +44,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger("talentscout_core")
 
-# Telemetry and LLM stubs for ingestion.py compatibility
+import time
+from groq import Groq
+
+# Telemetry and LLM for ingestion.py
 def add_timing(*args, **kwargs):
     pass
 
-def call_llm(*args, **kwargs):
-    pass
+def call_llm(messages, temperature=0.0, response_format=None, max_tokens=800, stage="parsing"):
+    if not getattr(settings, "GROQ_API_KEY", None):
+        raise RuntimeError("GROQ_API_KEY not configured")
+        
+    client = Groq(api_key=settings.GROQ_API_KEY)
+    kwargs = {
+        "model": "llama-3.1-8b-instant",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if response_format:
+        kwargs["response_format"] = response_format
+        
+    start = time.time()
+    try:
+        response = client.chat.completions.create(**kwargs)
+        result = response.choices[0].message.content
+        record_llm_call(stage, time.time() - start)
+        return result
+    except Exception as e:
+        logger.error(f"LLM Call Failed in {stage}: {e}")
+        raise
 
 def record_llm_call(*args, **kwargs):
     pass

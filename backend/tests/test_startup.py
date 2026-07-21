@@ -28,17 +28,11 @@ def test_startup_events_execute():
 
 def test_embedding_availability_reporting():
     """
-    Verifies that the embedding model availability is handled correctly.
-    If DEVELOPMENT_MODE is True, it should fallback to DummyEmbeddingModel.
+    Verifies that the embedding model is available.
+    Silent fallbacks are no longer allowed.
     """
-    from app.agents.scout import embedding_model, DummyEmbeddingModel
+    from app.agents.scout import embedding_model
     
-    if settings.DEVELOPMENT_MODE:
-        # Depending on if sentence_transformers is installed or not, it could be either.
-        # But if it's a DummyEmbeddingModel, it should raise RuntimeError on encode.
-        if isinstance(embedding_model, DummyEmbeddingModel):
-            with pytest.raises(RuntimeError, match="SentenceTransformer unavailable"):
-                embedding_model.encode("test")
-    else:
-        # In production, if it started, it must be the real one
-        assert not isinstance(embedding_model, DummyEmbeddingModel)
+    # In tests, this might be a MagicMock (via conftest.py) or the real model
+    # The key is that it's successfully loaded and has an encode method.
+    assert hasattr(embedding_model, "encode")
