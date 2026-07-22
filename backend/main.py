@@ -53,17 +53,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-origins = getattr(settings, "BACKEND_CORS_ORIGINS", [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://your-production-domain.com",
-    "https://www.your-production-domain.com",
-])
-
 # Configure CORS so the React.js frontend can communicate with FastAPI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"], # Update this to your React URL in production (e.g., localhost:3000)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

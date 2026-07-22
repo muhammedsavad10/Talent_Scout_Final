@@ -54,18 +54,20 @@ async def evaluate_candidate(
             logger.error(f"LangGraph execution error drop: {final_state.get('message')}")
             raise HTTPException(status_code=500, detail=final_state.get("message"))
         
-        # Return the structured payload matching the design metrics
-        return {
-            "status": "success",
-            "filename": file.filename,
+        # Save to store and return the standardized payload contract matching status & batch endpoints
+        final_state["filename"] = file.filename
+        final_state["evaluation_id"] = candidate_id
+        final_state["candidate_id"] = candidate_id
+        
+        full_eval = {
             "evaluation_id": candidate_id,
-            "evaluation": {
-                "parsed_resume": final_state.get("personal_info", {}),
-                "semantic_match_score": final_state.get("overall_score"),
-                "explicit_xai_metrics": final_state.get("decision_engine", {}).get("logic_trace", []),
-            },
-            "feedback_report": final_state.get("recommendation")
+            "filename": file.filename,
+            "status": "COMPLETED",
+            "result": final_state
         }
+        await evaluation_store.save_evaluation(candidate_id, full_eval)
+        
+        return full_eval
         
     except HTTPException as he:
         raise he

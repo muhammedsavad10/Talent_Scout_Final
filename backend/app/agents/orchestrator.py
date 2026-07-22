@@ -14,6 +14,25 @@ from app.agents.ingestion import parse_resume_to_json
 
 logger = logging.getLogger(__name__)
 
+def _build_skills_evidence(evidence_states: Dict[str, List[str]]) -> List[Dict[str, Any]]:
+    items = []
+    for status_key, skill_list in evidence_states.items():
+        is_identified = status_key in ("MATCHED", "INFERRED")
+        status_label = "Identified" if is_identified else "Not identified"
+        strength = "High" if is_identified else "Low"
+        for skill_name in skill_list:
+            items.append({
+                "skill": skill_name,
+                "status": status_label,
+                "evidence_snippet": None,
+                "project_name": None,
+                "role_held": None,
+                "evidence_strength": strength,
+                "match_confidence": 100 if is_identified else 0,
+                "reasoning": None
+            })
+    return items
+
 async def run_evaluation_pipeline(text: str, candidate_id: str, required_skills: List[str] = None) -> Dict[str, Any]:
     """
     Orchestrates the internal evaluation pipeline.
@@ -59,15 +78,76 @@ async def run_evaluation_pipeline(text: str, candidate_id: str, required_skills:
         # 5, 6, 7. Scorer -> Policy -> Strategy (Delegated to Decision Engine)
         decision_output = run_decision_engine(parsed_resume, required_skills)
         
-        # 8. Collect Outputs
+        # Extract nested data for enriched output
+        rec_section = decision_output.get("recommendation", {})
+        rec_basis = rec_section.get("recommendation_basis", {})
+        evidence_states = decision_output.get("evidence_states", {})
+        overall = decision_output.get("overall_score", 0)
+        
+        # Build the evidence section frontend expects
+        skills_evidence = _build_skills_evidence(evidence_states)
+        reasoning_text = rec_basis.get("reasoning", "")
+        strengths = rec_basis.get("strengths", [])
+        
         result = {
             "evaluation_id": candidate_id,
             "status": "success",
             "personal_info": parsed_resume.get("personal_info", {}),
             "contacts": contacts,
-            "overall_score": decision_output["overall_score"],
+            "overall_score": overall,
             "decision_engine": decision_output,
-            "recommendation": decision_output["recommendation"]
+            "recommendation": {
+                "hiring_recommendation": rec_section.get("hiring_recommendation", "Unknown"),
+                "rationale_bullets": [reasoning_text] if reasoning_text else [],
+                "candidate_summary": strengths,
+                "candidate_highlights": strengths[:3],
+                "disclaimer": "This assessment is based only on information present in the submitted resume."
+            },
+            "recommendation_basis": {
+                "strengths": strengths,
+                "weaknesses": rec_basis.get("weaknesses", []),
+                "critical_missing_skills": rec_basis.get("critical_missing_skills", []),
+                "domain_alignment": rec_basis.get("domain_alignment", "Unknown"),
+                "decision_reasoning": reasoning_text,
+                "reasoning": reasoning_text
+            },
+            "evidence": {
+                "skills_evidence": skills_evidence,
+                "business_impact": [],
+                "career_timeline": [],
+                "timeline_title": "Chronological Career Milestones"
+            },
+            "onboarding": {
+                "estimated_ramp_up": "2-4 weeks",
+                "rationale_factors": [],
+                "learning_curve": []
+            },
+            "interview": {
+                "verify_during_interview": [],
+                "interview_questions": {"easy": [], "medium": [], "advanced": []}
+            },
+            "recruiter": {
+                "confidence": {
+                    "skill_extraction": "High",
+                    "reasoning": "Medium",
+                    "learnability": "Medium",
+                    "evidence_justification": "Automated evaluation"
+                },
+                "resume_feedback": [],
+                "recruiter_notes": ""
+            },
+            "debug": {
+                "raw_weighted_score": overall / 100.0,
+                "raw_semantic_similarity": 0.0,
+                "raw_containment_score": 0.0,
+                "matched_tokens": evidence_states.get("MATCHED", []) + evidence_states.get("INFERRED", []),
+                "processing_ms": 0.0,
+                "agent_logs": [],
+                "pipeline_node_transitions": [
+                    "Parser", "Normalization", "Validation",
+                    "Scorer", "PolicyEngine", "Strategy"
+                ]
+            }
         }
         return result
         

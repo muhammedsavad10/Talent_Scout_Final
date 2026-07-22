@@ -1,31 +1,21 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Target, Award, BookOpen, CheckCircle, ArrowRight, FileText, Sparkles, HelpCircle, AlertCircle, Play
 } from 'lucide-react';
-import { mapEvaluationResponse } from '../services/evaluationMapper';
 
 const mockEvaluationData = {
   status: "success",
   filename: "muhammed_savad_ds_resume.pdf",
-  overall_score: 82,
-  decision_engine: {
-    overall_score: 82,
-    evidence_states: {
-      MATCHED: [
+  evaluation: {
+    semantic_match_score: 0.715,
+    explicit_xAI_metrics: {
+      jaccard_score: 0.8684,
+      weighted_score: 0.815,
+      matched_skills: [
         "Python", "Machine Learning", "SQL", "Docker", "AWS", "PyTorch", 
         "TensorFlow", "FastAPI", "Pandas", "NumPy", "Git"
       ],
-      MISSING: ["Qdrant", "Flask", "Agile"],
-      INFERRED: [],
-      CONTRADICTED: []
-    },
-    recommendation: {
-      hiring_recommendation: "Interview Candidate",
-      recommendation_basis: {
-        strengths: ["Strong ML & Deep Learning experience", "FastAPI microservices background"],
-        weaknesses: ["Missing Qdrant vector database experience"],
-        critical_missing_skills: ["Qdrant"]
-      }
+      missing_skills: ["Qdrant", "Flask", "Agile"]
     }
   },
   onboarding: {
@@ -65,40 +55,26 @@ You missed: **Qdrant**, **Flask**, and **Agile**.
 };
 
 const CandidatePortal = ({ evaluationData = null, activeRole = 'Candidate' }) => {
-  const [data, setData] = useState(() => {
+  const [data, setData] = useState(mockEvaluationData);
+  const [isUsingLive, setIsUsingLive] = useState(false);
+
+  useEffect(() => {
     if (evaluationData) {
-      return evaluationData.rawPayload || evaluationData;
-    }
-    try {
+      setData(evaluationData);
+      setIsUsingLive(true);
+    } else {
       const stored = localStorage.getItem('lastEvaluation');
       if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.rawPayload || parsed;
+        try {
+          const parsed = JSON.parse(stored);
+          setData(parsed);
+          setIsUsingLive(true);
+        } catch (e) {
+          console.error("Failed to parse cached evaluation from localStorage", e);
+        }
       }
-    } catch (e) {
-      console.error("Failed to parse cached evaluation from localStorage", e);
     }
-    return mockEvaluationData;
-  });
-
-  const [isUsingLive, setIsUsingLive] = useState(() => {
-    if (evaluationData) return true;
-    try {
-      const stored = localStorage.getItem('lastEvaluation');
-      return !!stored;
-    } catch {
-      return false;
-    }
-  });
-
-  const [prevEvalData, setPrevEvalData] = useState(evaluationData);
-  if (evaluationData !== prevEvalData) {
-    setPrevEvalData(evaluationData);
-    if (evaluationData) {
-      setData(evaluationData.rawPayload || evaluationData);
-      setIsUsingLive(true);
-    }
-  }
+  }, [evaluationData]);
 
   const handleClearCache = () => {
     localStorage.removeItem('lastEvaluation');
@@ -106,13 +82,21 @@ const CandidatePortal = ({ evaluationData = null, activeRole = 'Candidate' }) =>
     setIsUsingLive(false);
   };
 
-  // Centralized Evaluation Mapping
-  const mapped = mapEvaluationResponse(data) || {};
-  const filename = mapped.filename || "resume.pdf";
-  const overallScorePercent = mapped.overallScore ?? 0;
-  const matchedSkills = mapped.evidenceStates?.matched || [];
-  const missingSkills = mapped.evidenceStates?.missing || [];
-  const learningCurve = mapped.onboarding?.learning_curve || mapped.recommendation?.weaknesses?.map(w => ({ skill: w, difficulty: "Moderate", reason: w })) || [];
+  // Safe variables parsing
+  const filename = data.filename || "resume.pdf";
+  
+  // Extract strengths and missing skills from schemas safely
+  const matchedSkills = data.evidence?.skills_evidence?.filter(s => s.status.toLowerCase().includes("identified") && !s.status.toLowerCase().includes("not")).map(s => s.skill) 
+                        || data.evaluation?.explicit_xai_metrics?.matched_skills 
+                        || data.evaluation?.explicit_xAI_metrics?.matched_skills 
+                        || [];
+                        
+  const missingSkills = data.evidence?.skills_evidence?.filter(s => s.status.toLowerCase().includes("not")).map(s => s.skill)
+                        || data.evaluation?.explicit_xai_metrics?.missing_skills
+                        || data.evaluation?.explicit_xAI_metrics?.missing_skills
+                        || [];
+
+  const learningCurve = data.onboarding?.learning_curve || [];
   const resumeFeedback = data.recruiter?.resume_feedback || [];
 
   // Simple Markdown formatting helper for the AI feedback report
@@ -208,7 +192,11 @@ const CandidatePortal = ({ evaluationData = null, activeRole = 'Candidate' }) =>
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-center space-y-2">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Overall Match Score</h3>
             <div className="text-5xl font-black text-indigo-600 font-sans">
-              {overallScorePercent}%
+              {Math.round((data.evaluation?.explicit_xai_metrics?.weighted_score 
+                || data.evaluation?.explicit_xAI_metrics?.weighted_score 
+                || data.evaluation?.semantic_match_score 
+                || (data.overall_score !== undefined ? data.overall_score / 100 : 0)
+                || 0) * 100)}%
             </div>
             <p className="text-xs text-slate-400">Weighted comparison of semantic similarity and hard requirements match.</p>
           </div>
