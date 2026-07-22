@@ -57,7 +57,7 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
             "candidate_name": safe_get(safe_get(eval_obj, "personal_info", {}), "name", "Unknown Candidate"),
             "filename": safe_get(eval_obj, "filename", "unknown.pdf"),
             "recommendation_tier": safe_get(rec_section, "hiring_recommendation", "Unknown"),
-            "policy_eligible": True, # Hardcoded stub for C2
+            "policy_eligible": safe_get(safe_get(eval_obj, "decision_engine", {}), "policy_eligible", False),
             "overall_score": float(overall_score),
             "skill_match": extract_dimension_score(dimensions, "skill_match"),
             "experience_quantity": extract_dimension_score(dimensions, "experience_quantity"),
