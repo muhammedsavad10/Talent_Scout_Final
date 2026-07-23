@@ -1,0 +1,497 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TalentScout Multi-Agent API",
+    "description": "Multi-Agent Recruitment Intelligence System API Gateway",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/ingestion/upload": {
+      "post": {
+        "tags": [
+          "Ingestion"
+        ],
+        "summary": "Upload Resume",
+        "description": "Endpoint to upload a PDF resume, extract text, parse to JSON, \nand SAVE to PostgreSQL (CRUD: Create).",
+        "operationId": "upload_resume_api_v1_ingestion_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_v1_ingestion_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/evaluate": {
+      "post": {
+        "tags": [
+          "Evaluation Swarm"
+        ],
+        "summary": "Evaluate Candidate",
+        "description": "Ingests a PDF resume and job parameters, executes the LangGraph multi-agent swarm,\nand returns a mathematically transparent evaluation and feedback report.",
+        "operationId": "evaluate_candidate_api_v1_evaluation_evaluate_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_evaluate_candidate_api_v1_evaluation_evaluate_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/status/{evaluation_id}": {
+      "get": {
+        "tags": [
+          "Evaluation Swarm"
+        ],
+        "summary": "Get Evaluation Status",
+        "description": "Retrieves the full evaluation status and results for a specific candidate.",
+        "operationId": "get_evaluation_status_api_v1_evaluation_status__evaluation_id__get",
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/email/generate": {
+      "post": {
+        "tags": [
+          "Evaluation Swarm"
+        ],
+        "summary": "Generate Email",
+        "operationId": "generate_email_api_v1_evaluation_email_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/assistant/ask": {
+      "post": {
+        "tags": [
+          "Evaluation Swarm"
+        ],
+        "summary": "Ask Assistant",
+        "operationId": "ask_assistant_api_v1_evaluation_assistant_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluation/dev-mode/verify": {
+      "post": {
+        "tags": [
+          "Evaluation Swarm"
+        ],
+        "summary": "Dev Mode Verify",
+        "operationId": "dev_mode_verify_api_v1_evaluation_dev_mode_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluate/batch": {
+      "post": {
+        "tags": [
+          "Batch Evaluation"
+        ],
+        "summary": "Batch Evaluate Stub",
+        "description": "Ingests multiple PDF resumes and initiates a batch processing background task.",
+        "operationId": "batch_evaluate_stub_api_v1_evaluate_batch_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_batch_evaluate_stub_api_v1_evaluate_batch_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluate/batch/{batch_id}": {
+      "get": {
+        "tags": [
+          "Batch Evaluation"
+        ],
+        "summary": "Get Batch Status Stub",
+        "description": "Endpoint for polling batch status.",
+        "operationId": "get_batch_status_stub_api_v1_evaluate_batch__batch_id__get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "Health Check"
+        ],
+        "summary": "Root",
+        "description": "Root endpoint to verify API health.\n\nReturns:\n    dict: A welcome message and status.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/databases": {
+      "get": {
+        "tags": [
+          "Health Check"
+        ],
+        "summary": "Check Databases",
+        "description": "Endpoint to verify connections to Supabase and Qdrant.",
+        "operationId": "check_databases_health_databases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_batch_evaluate_stub_api_v1_evaluate_batch_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "job_description": {
+            "type": "string",
+            "title": "Job Description"
+          },
+          "jd_skills": {
+            "type": "string",
+            "title": "Jd Skills",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "files",
+          "job_description"
+        ],
+        "title": "Body_batch_evaluate_stub_api_v1_evaluate_batch_post"
+      },
+      "Body_evaluate_candidate_api_v1_evaluation_evaluate_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "jd_text": {
+            "type": "string",
+            "title": "Jd Text"
+          },
+          "jd_skills": {
+            "type": "string",
+            "title": "Jd Skills"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "jd_text",
+          "jd_skills"
+        ],
+        "title": "Body_evaluate_candidate_api_v1_evaluation_evaluate_post"
+      },
+      "Body_upload_resume_api_v1_ingestion_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_resume_api_v1_ingestion_upload_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

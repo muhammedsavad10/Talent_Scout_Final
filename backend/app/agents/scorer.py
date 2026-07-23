@@ -1,12 +1,7 @@
-"""
-Temporary reconstruction stub for Phase C2.
-Scoring Engine.
-Reconstructed after Phase 5 data loss.
-"""
+import re
 from typing import Dict, List, Any
 from app.models.schemas import DimensionMetadata
 
-# Hardcoded weights for deterministic reconstruction
 DIMENSION_WEIGHTS = {
     "skill_match": 0.40,
     "experience_quantity": 0.20,
@@ -14,78 +9,109 @@ DIMENSION_WEIGHTS = {
     "experience_quality": 0.15,
 }
 
+def _get_raw_text(parsed_resume: Dict[str, Any]) -> str:
+    return parsed_resume.get("raw_resume_text") or ""
+
+def _skill_appears_in_text(text_lower: str, skill_name: str) -> bool:
+    try:
+        return bool(re.search(r'\b' + re.escape(skill_name.lower()) + r'\b', text_lower))
+    except re.error:
+        return skill_name.lower() in text_lower
+
 def collect_evidence(parsed_resume: Dict[str, Any], required_skills: List[str]) -> Dict[str, Any]:
-    """
-    Separated evidence collection phase.
-    Categorizes skills into MATCHED, INFERRED, MISSING, CONTRADICTED.
-    """
-    candidate_skills = []
+    candidate_skills_lower = set()
+
     if "skills" in parsed_resume and isinstance(parsed_resume["skills"], dict):
         for cat, skills in parsed_resume["skills"].items():
             if isinstance(skills, list):
-                candidate_skills.extend([s.lower() for s in skills])
-    
-    # Also grab hard_skills if present
-    candidate_skills.extend([s.lower() for s in parsed_resume.get("hard_skills", [])])
-    
+                for s in skills:
+                    if isinstance(s, str):
+                        candidate_skills_lower.add(s.lower())
+
+    for s in parsed_resume.get("hard_skills", []):
+        if isinstance(s, str):
+            candidate_skills_lower.add(s.lower())
+
+    raw_text = _get_raw_text(parsed_resume)
+    text_lower = raw_text.lower()
+
     evidence = {
         "MATCHED": [],
         "INFERRED": [],
         "MISSING": [],
         "CONTRADICTED": []
     }
-    
+
     for req in required_skills:
         req_lower = req.lower()
-        if req_lower in candidate_skills:
+        in_parsed_list = req_lower in candidate_skills_lower
+        in_resume_text = _skill_appears_in_text(text_lower, req)
+
+        if in_parsed_list or in_resume_text:
             evidence["MATCHED"].append(req)
         else:
-            # Without LLM, we don't have inference yet, so default to MISSING
             evidence["MISSING"].append(req)
-            
-    # For duplicate detection/contradiction, assume a simplified logic
+
     return evidence
 
 def score_dimension(dimension: str, evidence: Dict[str, Any], parsed_resume: Dict[str, Any]) -> DimensionMetadata:
-    """
-    Separated dimension scoring phase.
-    """
     weight = DIMENSION_WEIGHTS.get(dimension, 0.1)
     score = 0
     confidence = 100
     evidence_list = []
-    
+
     if dimension == "skill_match":
         total_req = len(evidence["MATCHED"]) + len(evidence["INFERRED"]) + len(evidence["MISSING"]) + len(evidence["CONTRADICTED"])
         if total_req > 0:
-            # Basic deterministic scoring: Matched=1.0, Inferred=0.5
             matched = len(evidence["MATCHED"])
             inferred = len(evidence["INFERRED"])
             raw_score = (matched * 1.0 + inferred * 0.5) / total_req
             score = int(raw_score * 100)
-            evidence_list.append(f"Matched {matched} out of {total_req} required skills.")
+            matched_names = evidence["MATCHED"][:5]
+            missing_names = evidence["MISSING"][:5]
+            parts = []
+            if matched_names:
+                parts.append(f"Matched {matched}/{total_req} required skills: {', '.join(matched_names)}")
+            else:
+                parts.append(f"Matched {matched}/{total_req} required skills")
+            if missing_names:
+                parts.append(f"Missing: {', '.join(missing_names)}")
+            evidence_list.extend(parts)
         else:
             score = 100
-            evidence_list.append("No specific skills required.")
-            
+            evidence_list.append("No required skills specified for comparison.")
+
     elif dimension == "experience_quantity":
-        # Simplified deterministic experience scoring based on work history count
         work_entries = parsed_resume.get("work_history", [])
-        years_est = len(work_entries) * 2 # Assume 2 years per entry deterministically
+        years_est = len(work_entries) * 2
         score = min(100, years_est * 10)
-        evidence_list.append(f"Found {len(work_entries)} roles.")
-        
+        if work_entries:
+            roles = [w.get("role", "Unknown") for w in work_entries[:3]]
+            evidence_list.append(f"Found {len(work_entries)} roles: {', '.join(roles)}")
+        else:
+            evidence_list.append("No work history entries found in resume.")
+
     elif dimension == "experience_relevance":
-        # Simplified
-        score = 75 if evidence["MATCHED"] else 50
-        evidence_list.append("Deterministic baseline relevance.")
-        
+        matched_skills = evidence.get("MATCHED", [])
+        if matched_skills:
+            score = min(100, 50 + len(matched_skills) * 10)
+            evidence_list.append(f"Resume contains {len(matched_skills)} matching skills relevant to the role.")
+        else:
+            score = 30
+            evidence_list.append("No matching skills found in resume for this role.")
+
     elif dimension == "experience_quality":
-        score = 80
-        evidence_list.append("Deterministic baseline quality.")
-        
+        work_entries = parsed_resume.get("work_history", [])
+        if work_entries:
+            has_detailed = sum(1 for w in work_entries if len(w.get("description", "")) > 50)
+            quality_pct = (has_detailed / len(work_entries)) * 100
+            score = int(quality_pct)
+            evidence_list.append(f"{has_detailed}/{len(work_entries)} roles have detailed descriptions.")
+        else:
+            score = 30
+            evidence_list.append("No detailed work history to evaluate quality.")
+
     else:
-        # Fallback for unknown optional dimensions
         score = 50
         weight = 0.0
         confidence = 50
@@ -101,36 +127,25 @@ def score_dimension(dimension: str, evidence: Dict[str, Any], parsed_resume: Dic
     )
 
 def calculate_weighted_aggregation(dimensions: Dict[str, DimensionMetadata]) -> int:
-    """
-    Separated weighted aggregation phase.
-    """
     total_score = 0.0
     total_weight = 0.0
-    
+
     for dim_name, meta in dimensions.items():
         if meta.weight > 0:
             total_score += meta.score * meta.weight
             total_weight += meta.weight
-            
+
     if total_weight > 0:
         return int(total_score / total_weight)
     return 0
 
 def run_scorer(parsed_resume: Dict[str, Any], required_skills: List[str]) -> Dict[str, Any]:
-    """
-    Main entry point for the scorer.
-    """
-    # 1. Evidence Collection
     evidence = collect_evidence(parsed_resume, required_skills)
-    
-    # 2. Dimension Scoring
     dimensions = {}
     for dim in DIMENSION_WEIGHTS.keys():
         dimensions[dim] = score_dimension(dim, evidence, parsed_resume)
-        
-    # 3. Weighted Aggregation
     overall_score = calculate_weighted_aggregation(dimensions)
-    
+
     return {
         "overall_score": overall_score,
         "dimension_scores": dimensions,

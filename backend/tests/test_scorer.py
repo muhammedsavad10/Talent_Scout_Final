@@ -5,7 +5,11 @@ def test_scorer_perfect_candidate():
     parsed_resume = {
         "skills": {"languages": ["Python", "JavaScript"]},
         "hard_skills": ["FastAPI", "React"],
-        "work_history": [{}, {}, {}] # 6 years approx
+        "work_history": [
+            {"role": "Senior Engineer", "description": "Developed backend APIs using FastAPI and Python for three years in a production environment."},
+            {"role": "Backend Engineer", "description": "Built reactive web applications and microservices using React and JavaScript technologies."},
+            {"role": "Software Developer", "description": "Deployed cloud native services on AWS using Docker containers and Kubernetes orchestrators."}
+        ] # 6 years approx
     }
     required = ["Python", "FastAPI"]
     

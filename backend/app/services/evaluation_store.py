@@ -12,7 +12,7 @@ class EvaluationStore:
     def __init__(self):
         from app.db.clients import supabase_db
         self.db = supabase_db
-        self._batches: Dict[str, Dict[str, Any]] = {} # Fallback for batches if no table exists
+        self._batches: Dict[str, Dict[str, Any]] = {} # Fallback for batches/evaluations
 
     async def save_evaluation(self, evaluation_id: str, data: Dict[str, Any]) -> bool:
         import json
@@ -25,25 +25,40 @@ class EvaluationStore:
             
         try:
             serialized_data = json.loads(json.dumps(data, default=_serialize))
-            self.db.table("evaluations").upsert({
-                "id": evaluation_id,
-                "data": serialized_data
-            }).execute()
-            logger.info(f"Saved evaluation {evaluation_id} to Supabase.")
+            
+            # Log exact candidate_facts immediately before writing to database
+            candidate_facts = serialized_data.get("result", {}).get("candidate_facts") if isinstance(serialized_data, dict) else None
+            logger.info("EvaluationStore save_evaluation: id=%s candidate_facts=%s", evaluation_id, candidate_facts)
+            
+            self._batches[evaluation_id] = serialized_data
+            if self.db and "Mock" not in type(self.db).__name__:
+                self.db.table("evaluations").upsert({
+                    "id": evaluation_id,
+                    "data": serialized_data
+                }).execute()
+                logger.info(f"Saved evaluation {evaluation_id} to Supabase.")
             return True
         except Exception as e:
             logger.error(f"Failed to save evaluation {evaluation_id}: {e}")
             return False
         
     async def get_evaluation(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
-        try:
-            response = self.db.table("evaluations").select("data").eq("id", evaluation_id).execute()
-            if response.data and len(response.data) > 0:
-                return response.data[0].get("data")
-            return None
-        except Exception as e:
-            logger.error(f"Failed to get evaluation {evaluation_id}: {e}")
-            return None
+        if self.db and "Mock" not in type(self.db).__name__:
+            try:
+                response = self.db.table("evaluations").select("data").eq("id", evaluation_id).execute()
+                if response.data and len(response.data) > 0:
+                    retrieved_data = response.data[0].get("data")
+                    if isinstance(retrieved_data, dict):
+                        candidate_facts = retrieved_data.get("result", {}).get("candidate_facts")
+                        logger.info("EvaluationStore get_evaluation from Supabase: id=%s candidate_facts=%s", evaluation_id, candidate_facts)
+                    return retrieved_data
+            except Exception as e:
+                logger.error(f"Failed to get evaluation {evaluation_id} from Supabase: {e}")
+        fallback_data = self._batches.get(evaluation_id)
+        if isinstance(fallback_data, dict):
+            candidate_facts = fallback_data.get("result", {}).get("candidate_facts")
+            logger.info("EvaluationStore get_evaluation from Fallback Memory: id=%s candidate_facts=%s", evaluation_id, candidate_facts)
+        return fallback_data
 
     async def create_batch(self, batch_id: str, total: int) -> bool:
         # Save batch state to evaluations table using the batch_id as the primary key

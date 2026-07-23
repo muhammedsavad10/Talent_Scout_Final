@@ -37,10 +37,10 @@ def test_evaluate_endpoint_success(mocker):
     
     assert response.status_code == 200
     json_data = response.json()
-    assert json_data["status"] == "success"
-    assert "evaluation" in json_data
-    assert json_data["evaluation"]["semantic_match_score"] == 0.85
-    assert json_data["feedback_report"] == "Excellent profile."
+    assert json_data["status"] == "COMPLETED"
+    assert "result" in json_data
+    assert json_data["result"]["overall_score"] == 0.85
+    assert json_data["result"]["recommendation"] == "Excellent profile."
 
 def test_evaluate_endpoint_invalid_file_type():
     payload = {"jd_text": "Looking for developers.", "jd_skills": "Go"}

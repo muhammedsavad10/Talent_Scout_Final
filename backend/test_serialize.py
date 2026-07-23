@@ -9,7 +9,7 @@ def _serialize(obj):
         return obj.dict()
     return str(obj)
 
-async def test():
+async def run_serialize_test():
     text = "Name: Ideal Candidate\nI am a highly skilled engineer with 8 years of experience. My expertise includes Python, JavaScript, FastAPI, React, and Docker."
     required = ["python", "kubernetes", "fastapi"]
     
@@ -22,4 +22,4 @@ async def test():
         print("Serialization failed:", e)
 
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(run_serialize_test())

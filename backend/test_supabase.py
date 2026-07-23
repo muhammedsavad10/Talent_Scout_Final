@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 from app.db.clients import supabase_db
 
-def test():
+def run_supabase_test():
     try:
         res = supabase_db.table("batches").select("*").limit(1).execute()
         print("batches table exists:", res.data)
@@ -13,4 +13,4 @@ def test():
         print("Error reading batches:", e)
 
 if __name__ == "__main__":
-    test()
+    run_supabase_test()

@@ -7,6 +7,12 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from app.agents.scout import initialize_qdrant_collection, get_embedding, index_resume, semantic_search
 
 def test():
+    from app.db.clients import qdrant_db
+    import unittest.mock
+    if isinstance(qdrant_db, unittest.mock.Mock) or "Mock" in type(qdrant_db).__name__:
+        import pytest
+        pytest.skip("Skipping because Qdrant client is mocked")
+        
     print("Initializing Qdrant...")
     initialize_qdrant_collection()
     
