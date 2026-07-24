@@ -294,6 +294,7 @@ async def run_stage1_evaluation(
             "hiring_recommendation": rec_section.get("hiring_recommendation", "Unknown")
         },
         "decision_trace": decision_output.get("decision_trace", {}),
+        "hiring_priority": decision_output.get("hiring_priority", {}),
         "evidence": {
             "skills_evidence": skills_evidence,
             "business_impact": business_impact,
@@ -301,6 +302,7 @@ async def run_stage1_evaluation(
             "timeline_title": "Chronological Career Milestones"
         },
         "parsed_resume": parsed_resume,
+        "raw_resume_text": text,
         "raw_text": text
     }
 

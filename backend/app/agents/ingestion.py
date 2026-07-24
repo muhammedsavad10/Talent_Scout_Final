@@ -62,8 +62,11 @@ def split_resume_into_sections(raw_text: str) -> dict[str, str]:
         "experience": r"\b(experience|work experience|employment|work history|professional experience|internships|professional background|career history)\b",
         "projects": r"\b(projects|personal projects|technical projects|academic projects|notable projects)\b",
         "skills": r"\b(skills|technical skills|hard skills|expertise|technologies|tools|competencies|skills inventory)\b",
-        "certifications": r"\b(certifications|certificates|courses|awards|credentials|professional certifications)\b",
+        "certifications": r"\b(certifications|certificates|courses|licenses|credentials|professional certifications)\b",
         "languages": r"\b(languages|languages spoken)\b",
+        "achievements": r"\b(achievements|awards|honors|accolades|recognitions)\b",
+        "interests": r"\b(interests|hobbies|activities|extracurricular|involvement|community involvement|volunteering)\b",
+        "references": r"\b(references|recommendations)\b",
         "summary": r"\b(summary|objective|profile|professional summary|executive summary|about me|introduction)\b"
     }
     

@@ -447,6 +447,8 @@ async def run_evaluation_pipeline(
         # Stage 2: Recruiter Intelligence Engine (Explanatory layer, consumes Stage 1 as read-only)
         intelligence_data = run_stage2_intelligence(evaluation_data)
 
+        hp_data = evaluation_data.get("hiring_priority", {})
+
         # Build response with strict Stage 1 ("evaluation") and Stage 2 ("recruiter_intelligence") separation
         result = {
             "evaluation": evaluation_data,
@@ -462,6 +464,16 @@ async def run_evaluation_pipeline(
             "inferred_skills": evaluation_data.get("inferred_skills"),
             "missing_skills": evaluation_data.get("missing_skills"),
             "overall_score": evaluation_data.get("overall_score"),
+            "hiring_priority": hp_data,
+            "hiring_priority_score": hp_data.get("hiring_priority_score"),
+            "professional_profile": hp_data.get("professional_profile", {}),
+            "certifications": hp_data.get("certifications", []),
+            "production_indicators": hp_data.get("production_indicators", []),
+            "personal_projects": hp_data.get("personal_projects", []),
+            "priority_factors": hp_data.get("priority_factors", {}),
+            "fine_grained_evidence": hp_data.get("fine_grained_evidence", {}),
+            "parsed_resume": evaluation_data.get("parsed_resume", {}),
+            "raw_resume_text": evaluation_data.get("raw_resume_text", ""),
             "decision_engine": {
                 "overall_score": evaluation_data.get("overall_score"),
                 "policy_eligible": evaluation_data.get("policy_validation", {}).get("policy_eligible", True),

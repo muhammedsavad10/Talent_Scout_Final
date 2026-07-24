@@ -386,14 +386,36 @@ def normalize_production_indicators(full_text_buffer: str) -> List[str]:
 
     return sorted(list(indicators))
 
-def extract_structured_certifications(eval_obj: Dict[str, Any], parsed_res: Dict[str, Any], raw_text: str) -> List[Dict[str, str]]:
+CERT_ALIAS_MAP = [
+    (r'\bgoogle\s+ai\s+essentials\b', "Google AI Essentials", "Google", "Artificial Intelligence"),
+    (r'\bgoogle\s+kubernetes\s+engine\b|\bgke\b', "Google Kubernetes Engine (GKE)", "Google", "DevOps / Cloud"),
+    (r'\bgoogle\s+cloud\s+(?:foundations?|certified|architect)\b', "Google Cloud Certified", "Google", "Cloud Architecture"),
+    (r'\bibm\s+ai\s+engineering\b|\bibm\s+ai\s+engineering\s+professional\s+certificate\b', "IBM AI Engineering Professional Certificate", "IBM", "Machine Learning"),
+    (r'\bibm\s+(?:data\s+science|machine\s+learning)\b', "IBM AI/Data Science Certificate", "IBM", "Data Science"),
+    (r'\bcertified\s+data\s+scientist\b', "Certified Data Scientist", "Global Data Science Institute", "Data Science"),
+    (r'\btableau\s+(?:certified|data\s+analyst|desktop|specialist)\b', "Tableau Certified", "Tableau / Salesforce", "Business Intelligence"),
+    (r'\baws\s+certified\b|\baws\s+solutions\s+architect\b', "AWS Certified Professional", "AWS", "Cloud & ML"),
+    (r'\bazure\s+certified\b|\bmicrosoft\s+azure\b', "Microsoft Azure Certified", "Microsoft Azure", "Cloud Computing"),
+    (r'\bdatabricks\s+certified\b', "Databricks Certified Engineer", "Databricks", "Data Engineering"),
+    (r'\bsnowflake\s+certified\b', "Snowflake Certified Core Pro", "Snowflake", "Data Warehousing")
+]
+
+from app.core.cert_quality_gate import validate_and_gate_certification, clean_canonical_name
+
+def canonicalize_certification(raw_entry: Any, line_index: int = 1) -> Optional[Dict[str, Any]]:
     """
-    Extensive Certification Extraction Pipeline.
-    Extracts structured objects {"vendor": str, "name": str, "category": str}
-    from parsed fields and scans raw resume text for accredited industry certificates.
+    Validation & Quality Gate Entrypoint.
+    Returns clean serialized object or None if rejected by quality gate.
     """
-    certs = []
-    seen = set()
+    return validate_and_gate_certification(raw_entry, line_index=line_index)
+
+def extract_structured_certifications(eval_obj: Dict[str, Any], parsed_res: Dict[str, Any], raw_text: str) -> List[Dict[str, Any]]:
+    """
+    Phase 1-8 Certification Normalization, Serialization & Quality Gate Engine.
+    Merge raw + canonical, run Quality Gate validation, deduplicate BEFORE serialization,
+    preserve extracted issuers & providers, and guarantee exactly ONE object per unique certification.
+    """
+    raw_candidates = []
 
     raw_list = (
         parsed_res.get("certifications") or
@@ -404,47 +426,38 @@ def extract_structured_certifications(eval_obj: Dict[str, Any], parsed_res: Dict
         eval_obj.get("certification_names") or
         []
     )
-    if not isinstance(raw_list, list):
-        raw_list = [raw_list] if raw_list else []
+    if isinstance(raw_list, list):
+        raw_candidates.extend(raw_list)
 
-    for item in raw_list:
-        if isinstance(item, dict):
-            name = str(item.get("title") or item.get("name") or "").strip()
-            vendor = str(item.get("issuer") or item.get("vendor") or item.get("authority") or "").strip()
-            category = str(item.get("category") or "Technology").strip()
-            if name and name.lower() not in seen:
-                seen.add(name.lower())
-                certs.append({"vendor": vendor or "Industry Accredited", "name": name, "category": category})
-        elif isinstance(item, str) and item.strip():
-            name = item.strip()
-            if name.lower() not in seen:
-                seen.add(name.lower())
-                vendor = "Google" if "google" in name.lower() else "IBM" if "ibm" in name.lower() else "AWS" if "aws" in name.lower() else "Microsoft" if "microsoft" or "azure" in name.lower() else "Industry Accredited"
-                certs.append({"vendor": vendor, "name": name, "category": "Technology"})
+    from app.agents.deterministic_extractor import parse_certification_section_lines
+    cert_text = parsed_res.get("certifications_text", "") or parsed_res.get("raw_resume_text", "") or eval_obj.get("raw_resume_text", "")
+    if cert_text:
+        section_lines = parse_certification_section_lines(cert_text)
+        raw_candidates.extend(section_lines)
 
-    # Known industry cert patterns to detect in raw text
-    cert_patterns = [
-        (r'google\s+ai\s+essentials', 'Google', 'Google AI Essentials', 'Artificial Intelligence'),
-        (r'google\s+cloud\s+foundations?', 'Google', 'Google Cloud Foundations', 'Cloud Architecture'),
-        (r'google\s+kubernetes\s+engine', 'Google', 'Google Kubernetes Engine', 'DevOps / Cloud'),
-        (r'ibm\s+ai\s+engineering\s+(?:professional\s+certificate)?', 'IBM', 'IBM AI Engineering Professional Certificate', 'Machine Learning'),
-        (r'ibm\s+(?:data\s+science|machine\s+learning)', 'IBM', 'IBM AI/Data Science Certificate', 'Data Science'),
-        (r'certified\s+data\s+scientist', 'Global Data Science Institute', 'Certified Data Scientist', 'Data Science'),
-        (r'machine\s+learning\s+(?:certificate|certification|specialization)', 'Stanford / Coursera', 'Machine Learning Specialization', 'Machine Learning'),
-        (r'aws\s+certified\s+(?:solutions\s+architect|developer|machine\s+learning)?', 'AWS', 'AWS Certified Professional', 'Cloud & ML'),
-        (r'azure\s+certified\s+[a-z0-9\s]+', 'Microsoft Azure', 'Microsoft Azure Certified', 'Cloud Computing'),
-        (r'tableau\s+(?:desktop|certified|specialist|data\s+analyst)?', 'Tableau / Salesforce', 'Tableau Data Analyst', 'Business Intelligence'),
-        (r'databricks\s+(?:certified|lakehouse)?', 'Databricks', 'Databricks Certified Engineer', 'Data Engineering'),
-        (r'snowflake\s+(?:certified|pro)?', 'Snowflake', 'Snowflake Certified Core Pro', 'Data Warehousing')
-    ]
+    serialized_map: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-    text_lower = raw_text.lower()
-    for pattern, vendor, name, cat in cert_patterns:
-        if re.search(pattern, text_lower) and name.lower() not in seen:
-            seen.add(name.lower())
-            certs.append({"vendor": vendor, "name": name, "category": cat})
+    for idx, cand in enumerate(raw_candidates, 1):
+        if not cand:
+            continue
+        obj = validate_and_gate_certification(cand, line_index=idx)
+        if not obj:
+            continue
+        key = (obj["canonical_name"].lower(), obj["issuing_organization"].lower())
 
-    return certs
+        if key not in serialized_map:
+            serialized_map[key] = obj
+        else:
+            existing = serialized_map[key]
+            if len(obj["original_name"]) > len(existing["original_name"]):
+                existing["original_name"] = obj["original_name"]
+                existing["evidence"] = obj["original_name"]
+            if obj["training_provider"] != "N/A" and existing["training_provider"] == "N/A":
+                existing["training_provider"] = obj["training_provider"]
+            if obj["issue_date"] != "N/A" and existing["issue_date"] == "N/A":
+                existing["issue_date"] = obj["issue_date"]
+
+    return list(serialized_map.values())
 
 def extract_candidate_evidence(eval_obj: Dict[str, Any], parsed_resume: Optional[Dict[str, Any]] = None) -> CandidateEvidence:
     """

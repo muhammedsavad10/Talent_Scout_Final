@@ -221,10 +221,81 @@ def extract_skills_deterministically(text: str, source: str) -> List[Dict[str, A
 
     return found
 
+CERT_STOP_HEADINGS = {
+    "achievements", "awards", "honors", "accolades", "recognitions",
+    "interests", "hobbies", "activities", "extracurricular", "involvement",
+    "community involvement", "volunteering", "technical skills", "skills",
+    "languages", "experience", "work experience", "education", "projects",
+    "references", "summary", "contact", "about me", "personal info"
+}
+
+def parse_certification_section_lines(cert_text: str) -> List[str]:
+    """
+    Parses certifications text:
+    1. Locates the CERTIFICATIONS section header (if present) and skips pre-header text.
+    2. Stops reading certifications as soon as it reaches the next section heading (Achievements, Interests, Technical Skills, etc.).
+    3. Treats wrapped lines within a certification entry as continuations rather than separate certifications.
+    """
+    if not cert_text or not cert_text.strip():
+        return []
+
+    lines = [l.strip() for l in cert_text.split('\n') if l.strip()]
+    cert_entries = []
+
+    has_cert_header = any("certifi" in l.lower() or "course" in l.lower() or "license" in l.lower() for l in lines)
+    in_cert_section = not has_cert_header
+
+    for line in lines:
+        clean_lower = re.sub(r'[^a-z\s]', '', line.lower()).strip()
+        
+        if has_cert_header and not in_cert_section:
+            if clean_lower in ["certifications", "certification", "certificates", "licenses certifications", "courses certifications", "professional certifications", "courses", "licenses and certifications"]:
+                in_cert_section = True
+                continue
+            elif any(k in clean_lower for k in ["certifi", "license"]):
+                in_cert_section = True
+                continue
+            else:
+                continue
+
+        # Check if line is a section heading to stop parsing
+        if clean_lower in CERT_STOP_HEADINGS or any(clean_lower == h or clean_lower.startswith(h + " ") for h in CERT_STOP_HEADINGS):
+            if any(k in clean_lower for k in ["certifi", "course", "license"]):
+                continue
+            # Next section heading encountered -> STOP parsing certifications immediately
+            break
+
+        # Check if this line is a bullet item or new certification entry
+        is_bullet = bool(re.match(r'^(?:[\-\•\*\+\>\–\—]|(?:\d+[\.\)]))\s+', line))
+        clean_entry_line = re.sub(r'^(?:[\-\•\*\+\>\–\—]|(?:\d+[\.\)]))\s*', '', line).strip()
+
+        if not clean_entry_line:
+            continue
+
+        if is_bullet or not cert_entries:
+            cert_entries.append(clean_entry_line)
+        else:
+            # Wrapped line continuation: append to previous entry
+            prev = cert_entries[-1]
+            if not prev.endswith("-") and not prev.endswith("/"):
+                cert_entries[-1] = f"{prev} {clean_entry_line}"
+            else:
+                cert_entries[-1] = f"{prev}{clean_entry_line}"
+
+    return cert_entries
+
 def extract_certifications_deterministically(text: str) -> List[Dict[str, str]]:
     if not text:
         return []
+    entries = parse_certification_section_lines(text)
     certs = []
+    seen = set()
+
+    for entry in entries:
+        if entry.lower() not in seen and len(entry) >= 3:
+            seen.add(entry.lower())
+            certs.append({"title": entry})
+
     patterns = [
         (r'(?:AWS\s+Certified\s+[\w\s-]+)', "AWS Certified"),
         (r'(?:Certified\s+Kubernetes\s+Administrator)', "CKA"),
@@ -264,7 +335,7 @@ def extract_certifications_deterministically(text: str) -> List[Dict[str, str]]:
     ]
     for pattern, title in patterns:
         if re.search(pattern, text, re.IGNORECASE):
-            if not any(c["title"] == title for c in certs):
+            if not any(c["title"].lower() == title.lower() for c in certs):
                 certs.append({"title": title})
     return certs
 
