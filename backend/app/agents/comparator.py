@@ -52,6 +52,15 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
         recommendation_basis = safe_get(eval_obj, "recommendation_basis", {})
         rec_section = safe_get(eval_obj, "recommendation", {})
         
+        hiring_priority = safe_get(eval_obj, "hiring_priority")
+        if not hiring_priority:
+            from app.core.hiring_priority import compute_hiring_priority_score
+            eval_dict = eval_obj if isinstance(eval_obj, dict) else (eval_obj.__dict__ if hasattr(eval_obj, "__dict__") else {})
+            hiring_priority = compute_hiring_priority_score(eval_dict)
+            
+        hiring_priority_score = int(safe_get(hiring_priority, "hiring_priority_score", overall_score))
+        hiring_priority_tier = str(safe_get(hiring_priority, "hiring_priority_tier", "Standard Review"))
+
         row = {
             "evaluation_id": safe_get(eval_obj, "evaluation_id", "unknown"),
             "candidate_name": safe_get(safe_get(eval_obj, "personal_info", {}), "name", "Unknown Candidate"),
@@ -59,6 +68,9 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
             "recommendation_tier": safe_get(rec_section, "hiring_recommendation", "Unknown"),
             "policy_eligible": safe_get(safe_get(eval_obj, "decision_engine", {}), "policy_eligible", False),
             "overall_score": float(overall_score),
+            "hiring_priority_score": hiring_priority_score,
+            "hiring_priority_tier": hiring_priority_tier,
+            "hiring_priority": hiring_priority,
             "explicit_keyword_match": extract_dimension_score(dimensions, "explicit_keyword_match") or extract_dimension_score(dimensions, "skill_match"),
             "semantic_similarity": extract_dimension_score(dimensions, "semantic_similarity") or extract_dimension_score(dimensions, "role_fit"),
             "skill_match": extract_dimension_score(dimensions, "skill_match"),
@@ -78,8 +90,8 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
         }
         valid_candidates.append(row)
         
-    # Sort valid candidates by overall_score descending
-    valid_candidates.sort(key=lambda x: x["overall_score"], reverse=True)
+    # Sort valid candidates primarily by Stage 2 hiring_priority_score, with Stage 1 overall_score as tiebreaker
+    valid_candidates.sort(key=lambda x: (x["hiring_priority_score"], x["overall_score"]), reverse=True)
     
     # Assign ranks
     ranked = []

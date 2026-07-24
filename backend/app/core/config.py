@@ -64,7 +64,13 @@ def call_llm(messages, temperature=0.0, response_format=None, max_tokens=800, st
     """
     from app.services.ai_gateway import ai_gateway
     
-    task_type = "generation" if stage in ["interview_generation", "feedback_generation", "summary_generation", "copilot_assistant"] else "extraction"
+    if stage in ["assistant_ask", "copilot_assistant"]:
+        task_type = "assistant"
+    elif stage in ["interview_generation", "feedback_generation", "summary_generation"]:
+        task_type = "generation"
+    else:
+        task_type = "extraction"
+
     return ai_gateway.execute_request(
         messages=messages,
         temperature=temperature,

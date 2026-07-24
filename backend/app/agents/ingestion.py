@@ -104,6 +104,11 @@ def split_resume_into_sections(raw_text: str) -> dict[str, str]:
     # Sort indices
     header_indices.sort(key=lambda x: x[0])
     
+    # Capture header region text before the first section header
+    first_header_idx = header_indices[0][0]
+    if first_header_idx > 0:
+        sections["header"] = "\n".join(lines[:first_header_idx]).strip()
+
     # Extract content between headers
     for i in range(len(header_indices)):
         start_line_idx, sec_name = header_indices[i]
@@ -112,7 +117,7 @@ def split_resume_into_sections(raw_text: str) -> dict[str, str]:
             end_line_idx = header_indices[i + 1][0]
             
         sec_text = "\n".join(lines[start_line_idx:end_line_idx]).strip()
-        if sections[sec_name]:
+        if sections.get(sec_name):
             sections[sec_name] += "\n" + sec_text
         else:
             sections[sec_name] = sec_text
@@ -228,9 +233,10 @@ def parse_resume_to_json(raw_text: str) -> dict:
         parsed_data["unknown_skills"] = unknown_skills
         
         # 1b. Certifications
-        certs = extract_certifications_deterministically(sections.get("certifications", ""))
+        cert_text = sections.get("certifications", "") or sections.get("skills", "") or raw_text
+        certs = extract_certifications_deterministically(cert_text)
         parsed_data["certifications"] = certs
-        parsed_data["certification_names"] = [c["title"] for c in certs]
+        parsed_data["certification_names"] = [c["title"] for c in certs if isinstance(c, dict) and "title" in c]
         
         # 1c. Languages
         langs = extract_languages_deterministically(sections.get("languages", ""))

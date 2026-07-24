@@ -101,8 +101,26 @@ def run_decision_engine(
     
     trace = generate_decision_trace(scorer_output, policy_output, strategy_output, required_skills, parsed_resume)
 
+    from app.core.hiring_priority import compute_hiring_priority_score
+    eval_payload = {
+        "result": {
+            "overall_score": scorer_output.get("overall_score", 0),
+            "raw_resume_text": parsed_resume.get("raw_resume_text", ""),
+            "projects": parsed_resume.get("projects", []),
+            "work_history": parsed_resume.get("work_history", []),
+            "experience": parsed_resume.get("experience", []),
+            "certifications": parsed_resume.get("certifications", []),
+            "personal_info": parsed_resume.get("personal_info", {})
+        },
+        "parsed_resume": parsed_resume,
+        "raw_resume_text": parsed_resume.get("raw_resume_text", "")
+    }
+    hiring_priority = compute_hiring_priority_score(eval_payload, parsed_resume=parsed_resume)
+
     decision = {
         "overall_score": scorer_output.get("overall_score", 0),
+        "hiring_priority_score": hiring_priority["hiring_priority_score"],
+        "hiring_priority": hiring_priority,
         "dimension_scores": scorer_output.get("dimension_scores", {}),
         "evidence_states": scorer_output.get("evidence_states", {}),
         "policy_eligible": policy_output.get("is_eligible", False),

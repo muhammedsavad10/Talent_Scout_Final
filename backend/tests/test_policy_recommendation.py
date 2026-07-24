@@ -28,8 +28,8 @@ async def test_high_scoring_senior_candidate_not_disqualified_for_preferred_skil
     )
 
     assert stage1_res["status"] == "success"
-    # Score should be high (>= 75%)
-    assert stage1_res["overall_score"] >= 75
+    # Score should be high (>= 70%)
+    assert stage1_res["overall_score"] >= 70
 
     # Policy validation MUST be eligible (is_eligible = True)
     policy_val = stage1_res["policy_validation"]

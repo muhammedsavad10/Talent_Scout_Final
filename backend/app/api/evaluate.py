@@ -1,22 +1,22 @@
 """
-API Router for the LangGraph Multi-Agent Evaluation Engine.
+API Router for the LangGraph Multi-Agent Evaluation Engine and Grounded Recruiter Assistant.
 """
 import logging
 import json
 import unicodedata
 import traceback
+import re
+import uuid
+from typing import Optional, List, Dict, Any
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.agents.orchestrator import run_evaluation_pipeline
 from app.services.evaluation_store import evaluation_store
 from app.core.config import call_llm
+from app.agents.ingestion import extract_text_from_pdf
 
 logger = logging.getLogger("talentscout_api_evaluate")
 router = APIRouter()
-
-import uuid
-from app.agents.ingestion import extract_text_from_pdf
-
-from typing import Optional
 
 @router.post("/evaluate")
 async def evaluate_candidate(
@@ -100,10 +100,12 @@ async def generate_email(payload: dict):
     }
 
 def normalize_skill(skill: str) -> str:
+    if not isinstance(skill, str):
+        return ""
     return unicodedata.normalize("NFKC", skill).casefold().strip()
 
 def calculate_years_experience(work_history: list) -> str:
-    if not work_history:
+    if not isinstance(work_history, list) or not work_history:
         return "Experience duration cannot be determined from the available information."
     
     year_pattern = re.compile(r'\b(19\d{2}|20\d{2})\b')
@@ -114,7 +116,8 @@ def calculate_years_experience(work_history: list) -> str:
     for work in work_history:
         if not isinstance(work, dict):
             continue
-        dates_str = work.get("dates") or ""
+        dates_val = work.get("dates")
+        dates_str = str(dates_val) if dates_val is not None else ""
         if not dates_str:
             continue
         years = [int(y) for y in year_pattern.findall(dates_str)]
@@ -140,35 +143,41 @@ def calculate_years_experience(work_history: list) -> str:
     return "Experience duration cannot be determined from the available information."
 
 def extract_salary_information(raw_text: str) -> str:
-    if not raw_text:
+    raw_text_str = str(raw_text) if raw_text is not None else ""
+    if not raw_text_str:
         return "Salary information is not available in the resume."
     salary_patterns = [
         r'(?:CTC|salary|package|compensation|remuneration)\b[^\n.]{0,50}(?:\d[\d,.]*\s*(?:lakh|lpa|k|l|million|\$|inr|rs|usd))',
-        r'(?:\$|rs\.?|inr)\s*\d[\d,.]*\s*(?:lpa|lakh|k|pm|per\s*month)?'
+        r'(?:\$|rs\.?|inr)\s*\d[\d,.]*\s*(?:lakh|lpa|k|pm|per\s*month)?'
     ]
     for pattern in salary_patterns:
-        match = re.search(pattern, raw_text, re.IGNORECASE)
+        match = re.search(pattern, raw_text_str, re.IGNORECASE)
         if match:
             return match.group(0).strip()
     return "Salary information is not available in the resume."
 
 def extract_notice_period(raw_text: str) -> str:
-    if not raw_text:
+    raw_text_str = str(raw_text) if raw_text is not None else ""
+    if not raw_text_str:
         return "Notice period is not specified."
-    notice_pattern = r'(?:\bnotice\s*period\b|\bserving\s*notice\b|\bnotice\b)[^\n.]{0,30}(?:\d+\s*(?:day|month|week|lpa)|immediate|active)'
-    match = re.search(notice_pattern, raw_text, re.IGNORECASE)
-    if match:
-        return match.group(0).strip()
+    notice_patterns = [
+        r'\b\d+\s*(?:days?|months?|weeks?)\s+(?:notice\s*period|notice|serving\s*notice)\b',
+        r'\b(?:notice\s*period|serving\s*notice|notice)\b[^\n.]{0,30}(?:\d+\s*(?:days?|months?|weeks?|lpa)|immediate|active)'
+    ]
+    for pattern in notice_patterns:
+        match = re.search(pattern, raw_text_str, re.IGNORECASE)
+        if match:
+            return match.group(0).strip()
     return "Notice period is not specified."
 
 def extract_current_role_and_company(work_history: list) -> str:
-    if not work_history:
+    if not isinstance(work_history, list) or not work_history:
         return "Current role and company are not specified in the resume."
     first_job = work_history[0]
     if isinstance(first_job, dict):
-        role = first_job.get("role") or ""
-        company = first_job.get("company") or ""
-        dates = first_job.get("dates") or ""
+        role = str(first_job.get("role") or "").strip()
+        company = str(first_job.get("company") or "").strip()
+        dates = str(first_job.get("dates") or "").strip()
         is_current = any(w in dates.lower() for w in ["present", "current", "now", "ongoing"])
         if role and company:
             suffix = " (Current)" if is_current else ""
@@ -180,73 +189,87 @@ def extract_current_role_and_company(work_history: list) -> str:
     return "Current role and company are not specified in the resume."
 
 def extract_education(education_list: list) -> str:
-    if education_list:
-        return ", ".join(education_list)
+    if isinstance(education_list, list) and education_list:
+        clean_items = [str(e).strip() for e in education_list if e]
+        if clean_items:
+            return ", ".join(clean_items)
+    elif isinstance(education_list, str) and education_list.strip():
+        return education_list.strip()
     return "No education details are explicitly listed in the resume."
 
 def extract_certifications(certifications_list: list, flat_cert_names: list) -> str:
     certs = []
-    if certifications_list:
+    if isinstance(certifications_list, list) and certifications_list:
         for cert in certifications_list:
             if isinstance(cert, dict):
-                title = cert.get("title") or ""
-                issuer = cert.get("issuer") or ""
+                title = str(cert.get("title") or "").strip()
+                issuer = str(cert.get("issuer") or "").strip()
                 if title:
                     certs.append(f"{title} from {issuer}" if issuer else title)
-            elif isinstance(cert, str):
-                certs.append(cert)
-    elif flat_cert_names:
-        certs = flat_cert_names
+            elif isinstance(cert, str) and cert.strip():
+                certs.append(cert.strip())
+    
+    if not certs and isinstance(flat_cert_names, list) and flat_cert_names:
+        certs = [str(c).strip() for c in flat_cert_names if c]
         
     if certs:
         return ", ".join(certs)
     return "No certifications are explicitly listed in the resume."
 
 def extract_candidate_deterministic_metadata(eval_data: dict) -> dict:
-    result = eval_data.get("result", {})
-    personal_info = result.get("personal_info", {})
-    evidence = result.get("evidence", {})
+    if not isinstance(eval_data, dict):
+        eval_data = {}
+    result = eval_data.get("result", {}) if isinstance(eval_data.get("result"), dict) else {}
+    personal_info = result.get("personal_info", {}) if isinstance(result.get("personal_info"), dict) else {}
+    evidence = result.get("evidence", {}) if isinstance(result.get("evidence"), dict) else {}
     
-    # Extract work history
-    work_history = result.get("work_history") or []
-    if not work_history:
-        parsed_resume = result.get("parsed_resume", {})
-        work_history = parsed_resume.get("work_history") or []
-    if not work_history:
+    # Extract work history safely
+    work_history = result.get("work_history")
+    if not isinstance(work_history, list) or not work_history:
+        parsed_resume = result.get("parsed_resume", {}) if isinstance(result.get("parsed_resume"), dict) else {}
+        work_history = parsed_resume.get("work_history")
+    if not isinstance(work_history, list) or not work_history:
         timeline = evidence.get("career_timeline", [])
-        if timeline:
-            work_history = [{"role": t.get("role"), "company": t.get("company"), "dates": t.get("year")} for t in timeline if isinstance(t, dict)]
+        if isinstance(timeline, list) and timeline:
+            work_history = [
+                {"role": t.get("role"), "company": t.get("company"), "dates": t.get("year")}
+                for t in timeline if isinstance(t, dict)
+            ]
+    if not isinstance(work_history, list):
+        work_history = []
             
     # Years of experience calculation
     exp_duration = calculate_years_experience(work_history)
     
     # Raw text for regex searches
     raw_text = result.get("raw_resume_text") or ""
+    if not isinstance(raw_text, str):
+        raw_text = str(raw_text)
     
     salary_info = extract_salary_information(raw_text)
     notice_period = extract_notice_period(raw_text)
     current_role_company = extract_current_role_and_company(work_history)
     
     # Education
-    education_list = result.get("education") or []
-    if not education_list:
-        parsed_resume = result.get("parsed_resume", {})
+    education_list = result.get("education")
+    if not isinstance(education_list, list) or not education_list:
+        parsed_resume = result.get("parsed_resume", {}) if isinstance(result.get("parsed_resume"), dict) else {}
         education_list = parsed_resume.get("education") or []
     education = extract_education(education_list)
     
     # Certifications
-    certifications_list = result.get("certifications") or []
-    if not certifications_list:
-        parsed_resume = result.get("parsed_resume", {})
+    certifications_list = result.get("certifications")
+    if not isinstance(certifications_list, list) or not certifications_list:
+        parsed_resume = result.get("parsed_resume", {}) if isinstance(result.get("parsed_resume"), dict) else {}
         certifications_list = parsed_resume.get("certifications") or []
-    flat_cert_names = result.get("certification_names") or []
-    if not flat_cert_names:
-        parsed_resume = result.get("parsed_resume", {})
+    flat_cert_names = result.get("certification_names")
+    if not isinstance(flat_cert_names, list) or not flat_cert_names:
+        parsed_resume = result.get("parsed_resume", {}) if isinstance(result.get("parsed_resume"), dict) else {}
         flat_cert_names = parsed_resume.get("certification_names") or []
     certifications = extract_certifications(certifications_list, flat_cert_names)
     
     return {
-        "candidate_name": personal_info.get("name", "Unknown"),
+        "candidate_name": str(personal_info.get("name") or "Unknown"),
         "experience_duration": exp_duration,
         "salary_info": salary_info,
         "notice_period": notice_period,
@@ -256,48 +279,62 @@ def extract_candidate_deterministic_metadata(eval_data: dict) -> dict:
     }
 
 def validate_and_sanitize_response(parsed: dict, deterministic_data: dict) -> dict:
-    answer = parsed.get("answer") or ""
-    
-    # 1. Validate experience duration mismatch
-    experience_str = deterministic_data.get("experience_duration", "")
-    years_mentioned = re.findall(r'\b(\d+(?:\.\d+)?)\s*(?:years|year)\b', answer.lower())
-    
-    if years_mentioned:
-        det_years_match = re.search(r'\b(\d+(?:\.\d+)?)\s*Years\b', experience_str)
-        if det_years_match:
-            det_years = float(det_years_match.group(1))
-            for yr_str in years_mentioned:
-                yr_val = float(yr_str)
-                if abs(yr_val - det_years) > 1.5 or yr_val > det_years + 0.5:
-                    logger.warning("Factual mismatch detected: LLM claims %s years of experience, but deterministic is %s. Applying fallback.", yr_str, det_years)
-                    parsed["answer"] = parsed["answer"].replace(yr_str + " years", f"{det_years} years").replace(yr_str + " year", f"{det_years} years")
-                    parsed["answer"] = f"Candidate has a verified total of {experience_str} of experience. " + parsed["answer"]
-                    parsed["confidence"] = "Medium"
-        else:
-            for yr_str in years_mentioned:
-                logger.warning("LLM guessed experience (%s years) but experience duration cannot be determined. Applying fallback.", yr_str)
-                parsed["answer"] = parsed["answer"].replace(f"{yr_str} years", "unspecified duration").replace(f"{yr_str} year", "unspecified duration")
+    if not isinstance(parsed, dict):
+        return {
+            "answer": "I couldn't find evidence for that in the evaluated resume.",
+            "citations": [],
+            "confidence": "Low",
+            "match_type": "None",
+            "interview_verification": "Verify candidate details during interview."
+        }
+    if not isinstance(deterministic_data, dict):
+        deterministic_data = {}
+
+    try:
+        answer = str(parsed.get("answer") or "")
+        
+        # 1. Validate experience duration mismatch
+        experience_str = str(deterministic_data.get("experience_duration") or "")
+        years_mentioned = re.findall(r'\b(\d+(?:\.\d+)?)\s*(?:years|year)\b', answer.lower())
+        
+        if years_mentioned:
+            det_years_match = re.search(r'\b(\d+(?:\.\d+)?)\s*Years\b', experience_str)
+            if det_years_match:
+                det_years = float(det_years_match.group(1))
+                for yr_str in years_mentioned:
+                    yr_val = float(yr_str)
+                    if abs(yr_val - det_years) > 1.5 or yr_val > det_years + 0.5:
+                        logger.warning("Factual mismatch detected: LLM claims %s years of experience, but deterministic is %s. Applying fallback.", yr_str, det_years)
+                        parsed["answer"] = parsed["answer"].replace(yr_str + " years", f"{det_years} years").replace(yr_str + " year", f"{det_years} years")
+                        parsed["answer"] = f"Candidate has a verified total of {experience_str} of experience. " + parsed["answer"]
+                        parsed["confidence"] = "Medium"
+            else:
+                for yr_str in years_mentioned:
+                    logger.warning("LLM guessed experience (%s years) but experience duration cannot be determined. Applying fallback.", yr_str)
+                    parsed["answer"] = parsed["answer"].replace(f"{yr_str} years", "unspecified duration").replace(f"{yr_str} year", "unspecified duration")
+                    parsed["confidence"] = "Low"
+
+        # 2. Validate salary expectations/current salary fabrication
+        salary_info = str(deterministic_data.get("salary_info") or "")
+        if "not available" in salary_info.lower():
+            salary_markers = re.findall(r'\b(?:\d[\d,.]*\s*(?:lakh|lpa|k|l|million|\$|inr|rs|usd))\b', answer.lower())
+            if salary_markers:
+                logger.warning("LLM generated a salary fabrication: %s. Sanitizing response.", salary_markers)
+                parsed["answer"] = re.sub(r'\b(?:\d[\d,.]*\s*(?:lakh|lpa|k|l|million|\$|inr|rs|usd))\b', "[information not specified in resume]", parsed["answer"], flags=re.IGNORECASE)
                 parsed["confidence"] = "Low"
 
-    # 2. Validate salary expectations/current salary fabrication
-    salary_info = deterministic_data.get("salary_info", "")
-    if "not available" in salary_info.lower():
-        salary_markers = re.findall(r'\b(?:\d[\d,.]*\s*(?:lakh|lpa|k|l|million|\$|inr|rs|usd))\b', answer.lower())
-        if salary_markers:
-            logger.warning("LLM generated a salary fabrication: %s. Sanitizing response.", salary_markers)
-            parsed["answer"] = re.sub(r'\b(?:\d[\d,.]*\s*(?:lakh|lpa|k|l|million|\$|inr|rs|usd))\b', "[information not specified in resume]", parsed["answer"], flags=re.IGNORECASE)
-            parsed["confidence"] = "Low"
-
-    # 3. Validate notice period fabrication
-    notice_info = deterministic_data.get("notice_period", "")
-    if "not specified" in notice_info.lower():
-        notice_words = ["notice period", "notice", "days notice", "month notice"]
-        if any(w in answer.lower() for w in notice_words):
-            fabricated_notice = re.findall(r'\b(?:30|60|90|15|45)\b', answer.lower())
-            if fabricated_notice:
-                logger.warning("LLM fabricated notice period: %s. Sanitizing response.", fabricated_notice)
-                parsed["answer"] = "Notice period is not specified in the candidate's resume. " + parsed["answer"]
-                parsed["confidence"] = "Low"
+        # 3. Validate notice period fabrication
+        notice_info = str(deterministic_data.get("notice_period") or "")
+        if "not specified" in notice_info.lower():
+            notice_words = ["notice period", "notice", "days notice", "month notice"]
+            if any(w in answer.lower() for w in notice_words):
+                fabricated_notice = re.findall(r'\b(?:30|60|90|15|45)\b', answer.lower())
+                if fabricated_notice:
+                    logger.warning("LLM fabricated notice period: %s. Sanitizing response.", fabricated_notice)
+                    parsed["answer"] = "Notice period is not specified in the candidate's resume. " + parsed["answer"]
+                    parsed["confidence"] = "Low"
+    except Exception as e:
+        logger.exception("Error during response validation/sanitization: %s", e)
 
     return parsed
 
@@ -310,6 +347,9 @@ async def ask_assistant(payload: dict):
     logger.info("Copilot Assistant Step 1: Received request. Payload: %s", payload)
     
     try:
+        if not isinstance(payload, dict):
+            payload = {}
+
         # Extract and validate request parameters
         evaluation_id = payload.get("candidate_id") or payload.get("evaluation_id")
         query = payload.get("query")
@@ -324,7 +364,7 @@ async def ask_assistant(payload: dict):
                     "stage": stage
                 }
             )
-        if not query or not query.strip():
+        if not query or not str(query).strip():
             logger.error("Request validation failed: query parameter is missing or empty.")
             raise HTTPException(
                 status_code=400,
@@ -365,17 +405,30 @@ async def ask_assistant(payload: dict):
         # Step 3: Construct Grounded Context
         stage = "context_construction"
         logger.info("Copilot Assistant Step 3: Constructing grounded context.")
-        result = eval_data.get("result", {})
-        personal_info = result.get("personal_info", {})
-        matched_skills = result.get("matched_skills", [])
-        missing_skills = result.get("missing_skills", [])
-        evidence = result.get("evidence", {})
-        rec_basis = result.get("recommendation_basis", {})
-        rec = result.get("recommendation", {})
+        result = eval_data.get("result", {}) if isinstance(eval_data.get("result"), dict) else {}
+        personal_info = result.get("personal_info", {}) if isinstance(result.get("personal_info"), dict) else {}
+        matched_skills = result.get("matched_skills", []) if isinstance(result.get("matched_skills"), list) else []
+        missing_skills = result.get("missing_skills", []) if isinstance(result.get("missing_skills"), list) else []
+        evidence = result.get("evidence", {}) if isinstance(result.get("evidence"), dict) else {}
+        rec_basis = result.get("recommendation_basis", {}) if isinstance(result.get("recommendation_basis"), dict) else {}
+        rec = result.get("recommendation", {}) if isinstance(result.get("recommendation"), dict) else {}
         overall_score = result.get("overall_score", 0)
 
-        # Calculate deterministic facts programmatically
-        det_data = extract_candidate_deterministic_metadata(eval_data)
+        # Safely compute deterministic facts programmatically without throwing 500
+        try:
+            det_data = extract_candidate_deterministic_metadata(eval_data)
+        except Exception as e:
+            logger.exception("Failed to extract candidate deterministic metadata: %s", e)
+            det_data = {
+                "candidate_name": str(personal_info.get("name") or "Unknown"),
+                "experience_duration": "Experience duration cannot be determined from the available information.",
+                "salary_info": "Salary information is not available in the resume.",
+                "notice_period": "Notice period is not specified.",
+                "current_role_company": "Current role and company are not specified in the resume.",
+                "education": "No education details are explicitly listed in the resume.",
+                "certifications": "No certifications are explicitly listed in the resume."
+            }
+
         logger.info("Deterministic candidate metadata computed: %s", det_data)
 
         # Log parameters counts for verification
@@ -398,13 +451,13 @@ Matched Skills: {", ".join(matched_skills) if matched_skills else "None"}
 Missing Skills: {", ".join(missing_skills) if missing_skills else "None"}
 
 Candidate Strengths:
-{chr(10).join(f"- {s}" for s in rec_basis.get('strengths', []))}
+{chr(10).join(f"- {s}" for s in rec_basis.get('strengths', [])) if isinstance(rec_basis.get('strengths'), list) else "- None"}
 
 Candidate Gap Areas:
-{chr(10).join(f"- {w}" for w in rec_basis.get('weaknesses', []))}
+{chr(10).join(f"- {w}" for w in rec_basis.get('weaknesses', [])) if isinstance(rec_basis.get('weaknesses'), list) else "- None"}
 
 Business Impact:
-{chr(10).join(f"- [{i.get('category')}]: {i.get('description')}" for i in evidence.get('business_impact', []) if isinstance(i, dict))}
+{chr(10).join(f"- [{i.get('category')}]: {i.get('description')}" for i in evidence.get('business_impact', []) if isinstance(i, dict)) if isinstance(evidence.get('business_impact'), list) else "- None"}
 
 Detailed Skills Evidence:
 """
@@ -427,9 +480,10 @@ Detailed Skills Evidence:
             logger.warning("skills_evidence format is unsupported: %s", type(skills_evidence).__name__)
                 
         context += "\nCareer Timeline Milestones:\n"
-        for milestone in evidence.get("career_timeline", []):
-            if isinstance(milestone, dict):
-                context += f"- {milestone.get('year', '')}: {milestone.get('role', '')} at {milestone.get('company', '')} ({milestone.get('description', '')[:200]})\n"
+        if isinstance(evidence.get("career_timeline"), list):
+            for milestone in evidence.get("career_timeline", []):
+                if isinstance(milestone, dict):
+                    context += f"- {milestone.get('year', '')}: {milestone.get('role', '')} at {milestone.get('company', '')} ({str(milestone.get('description', ''))[:200]})\n"
 
         # Step 4: Call LLM model pipeline
         stage = "llm_query"
@@ -437,7 +491,7 @@ Detailed Skills Evidence:
         
         system_prompt = f"""You are an AI Recruiter Copilot.
 You are not allowed to invent, extrapolate, or assume facts. Answer questions only using the supplied candidate context evaluation record and the verified deterministic candidate metadata.
-If the evidence is not sufficient to answer the question, explicitly state: "The available resume and evaluation data do not provide enough evidence to answer this question." Do not guess or extrapolate.
+If the evidence is not sufficient to answer the question, explicitly state: "I couldn't find evidence for that in the evaluated resume." Do not guess or extrapolate.
 
 We have deterministically extracted these verified facts from the candidate's file. You MUST use these values as the source of truth if the user's question asks for them:
 - Candidate Name: {det_data.get('candidate_name')}
@@ -504,7 +558,7 @@ Question: {query}
 
         # Validate required properties
         required_keys = ["answer", "citations", "confidence", "match_type", "interview_verification"]
-        missing_keys = [k for k in required_keys if k not in parsed]
+        missing_keys = [k for k in required_keys if not isinstance(parsed, dict) or k not in parsed]
         if missing_keys:
             logger.error("LLM JSON output is missing required fields: %s. Raw response: %s", missing_keys, response)
             raise HTTPException(

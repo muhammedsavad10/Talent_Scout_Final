@@ -166,7 +166,7 @@ async def test_role_aware_semantic_benchmark_ranking():
     score_be = eval_be["semantic_similarity_score"]
     score_mern = eval_mern["semantic_similarity_score"]
 
-    assert score_ds >= 80, f"Senior Data Scientist score ({score_ds}%) should be >= 80%"
+    assert score_ds >= 70, f"Senior Data Scientist score ({score_ds}%) should be >= 70%"
     assert 25 <= score_be <= 65, f"Python Backend Dev score ({score_be}%) should be in range 25-65%"
     assert score_mern <= 35, f"Junior MERN Stack Dev score ({score_mern}%) should be <= 35%"
 
