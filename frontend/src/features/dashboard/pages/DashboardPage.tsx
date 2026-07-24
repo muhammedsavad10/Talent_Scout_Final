@@ -104,20 +104,21 @@ export const DashboardPage: React.FC = () => {
     },
     {
       key: 'candidate_name',
-      header: 'Candidate Name',
+      header: 'Candidate',
       render: (c: RankedCandidate) => (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: 500, color: '#ffffff' }}>{c.candidate_name}</span>
+          <span style={{ fontWeight: 600, color: '#ffffff' }}>{c.candidate_name}</span>
           <span style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}>{c.filename}</span>
         </div>
       )
     },
     {
       key: 'overall_score',
-      header: 'Overall Score',
+      header: 'Overall',
       render: (c: RankedCandidate) => (
         <span style={{
-          fontWeight: 600,
+          fontWeight: 700,
+          fontSize: '14px',
           color: c.overall_score >= 80 ? 'hsl(var(--success))' : c.overall_score >= 60 ? 'hsl(var(--accent))' : 'inherit'
         }}>
           {c.overall_score}%
@@ -125,16 +126,40 @@ export const DashboardPage: React.FC = () => {
       )
     },
     {
+      key: 'explicit_keyword_match',
+      header: 'Explicit Match (40%)',
+      render: (c: RankedCandidate) => (
+        <span style={{
+          fontWeight: 600,
+          color: ((c as any).explicit_keyword_match ?? c.skill_match ?? c.overall_score) >= 75 ? '#3b82f6' : 'hsl(var(--muted-foreground))'
+        }}>
+          {((c as any).explicit_keyword_match ?? c.skill_match) ? `${(c as any).explicit_keyword_match ?? c.skill_match}%` : `${c.overall_score}%`}
+        </span>
+      )
+    },
+    {
+      key: 'semantic_similarity',
+      header: 'Semantic Sim (60%)',
+      render: (c: RankedCandidate) => (
+        <span style={{
+          fontWeight: 600,
+          color: ((c as any).semantic_similarity ?? (c as any).role_fit ?? c.overall_score) >= 75 ? '#a78bfa' : 'hsl(var(--muted-foreground))'
+        }}>
+          {((c as any).semantic_similarity ?? (c as any).role_fit) ? `${(c as any).semantic_similarity ?? (c as any).role_fit}%` : `${c.overall_score}%`}
+        </span>
+      )
+    },
+    {
       key: 'recommendation_tier',
-      header: 'Recommendation Tier',
+      header: 'Recommendation',
       render: (c: RankedCandidate) => (
         <span style={{
           padding: '4px 10px',
           borderRadius: '12px',
           fontSize: '11px',
           fontWeight: 600,
-          background: c.recommendation_tier === 'Tier 1' || c.recommendation_tier === 'Hire' ? 'hsla(var(--success), 0.12)' : 'hsla(var(--foreground), 0.04)',
-          color: c.recommendation_tier === 'Tier 1' || c.recommendation_tier === 'Hire' ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))',
+          background: c.recommendation_tier === 'Tier 1' || c.recommendation_tier === 'Hire' || c.recommendation_tier === 'Strong Hire' ? 'hsla(var(--success), 0.12)' : 'hsla(var(--foreground), 0.04)',
+          color: c.recommendation_tier === 'Tier 1' || c.recommendation_tier === 'Hire' || c.recommendation_tier === 'Strong Hire' ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))',
         }}>
           {c.recommendation_tier}
         </span>
@@ -142,13 +167,13 @@ export const DashboardPage: React.FC = () => {
     },
     {
       key: 'policy_eligible',
-      header: 'Gate Eligibility',
+      header: 'Meets Hiring Policy',
       render: (c: RankedCandidate) => (
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
           {c.policy_eligible ? (
             <>
               <ShieldCheck size={16} style={{ color: 'hsl(var(--success))' }} />
-              Eligible
+              Meets Policy
             </>
           ) : (
             <>

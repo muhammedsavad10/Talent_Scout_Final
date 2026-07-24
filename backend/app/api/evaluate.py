@@ -16,11 +16,13 @@ router = APIRouter()
 import uuid
 from app.agents.ingestion import extract_text_from_pdf
 
+from typing import Optional
+
 @router.post("/evaluate")
 async def evaluate_candidate(
     file: UploadFile = File(...),
     jd_text: str = Form(...),
-    jd_skills: str = Form(...)  # Expects a comma-separated string (e.g., "Python, FastAPI, Docker")
+    jd_skills: Optional[str] = Form(default="")  # Optional comma-separated string (e.g., "Python, FastAPI")
 ):
     """
     Ingests a PDF resume and job parameters, executes the LangGraph multi-agent swarm,
@@ -50,7 +52,8 @@ async def evaluate_candidate(
         final_state = await run_evaluation_pipeline(
             text=text,
             candidate_id=candidate_id,
-            required_skills=skills_list
+            required_skills=skills_list,
+            jd_text=jd_text
         )
         
         # Gracefully handle internal state machine tracking drops

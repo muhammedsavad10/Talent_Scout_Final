@@ -68,9 +68,41 @@ export interface RecruiterInfo {
   recruiter_notes: string;
 }
 
+export interface DimensionMetadata {
+  score: number;
+  confidence: number;
+  weight: number;
+  evidence: string[];
+  status?: string;
+  sources?: string[];
+}
+
 export interface DecisionEngineOutput {
   policy_eligible?: boolean;
   logic_trace?: any[];
+  dimension_scores?: Record<string, DimensionMetadata>;
+}
+
+export interface LearningCurveItem {
+  skill: string;
+  difficulty: string;
+  reason: string;
+}
+
+export interface OnboardingInfo {
+  estimated_ramp_up: string;
+  rationale_factors: string[];
+  learning_curve: LearningCurveItem[];
+}
+
+export interface DebugPayload {
+  raw_weighted_score: number;
+  raw_semantic_similarity: number;
+  raw_containment_score: number;
+  matched_tokens: string[];
+  processing_ms: number;
+  agent_logs: string[];
+  pipeline_node_transitions: string[];
 }
 
 export interface CandidateEvaluationResult {
@@ -91,6 +123,13 @@ export interface CandidateEvaluationResult {
     current_employer?: string | null;
     policy_eligible?: boolean;
   };
+  certification_suitability?: {
+    score: number;
+    reasoning: string;
+    classifications: Array<{ title: string; tier: string }>;
+  };
+  onboarding?: OnboardingInfo;
+  debug?: DebugPayload;
 }
 
 export interface CandidateEvaluationPayload {

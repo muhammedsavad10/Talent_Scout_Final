@@ -56,15 +56,20 @@ def test_strategy_reject_policy_failed():
     res = generate_strategy({"overall_score": 95}, {"is_eligible": False})
     assert res["hiring_recommendation"] == "Reject"
 
-def test_strategy_hold_bypass():
-    res = generate_strategy({"overall_score": 30}, {"is_eligible": True})
-    assert res["hiring_recommendation"] == "Hold"
+def test_strategy_review_and_reject_tiers():
+    res_review = generate_strategy({"overall_score": 50}, {"is_eligible": True})
+    assert res_review["hiring_recommendation"] == "Review"
+
+    res_reject = generate_strategy({"overall_score": 30}, {"is_eligible": True})
+    assert res_reject["hiring_recommendation"] == "Reject"
 
 # --- Decision Engine Tests ---
 def test_decision_engine_happy_path():
     parsed_resume = {
         "skills": {"languages": ["Python", "JavaScript"]},
-        "work_history": [{}, {}, {}]
+        "hard_skills": ["Python", "FastAPI"],
+        "work_history": [{"role": "Senior Backend Engineer", "description": "Python FastAPI APIs."}],
+        "raw_resume_text": "Senior Backend Engineer with Python and FastAPI."
     }
     required = ["Python"]
     decision = run_decision_engine(parsed_resume, required)

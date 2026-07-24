@@ -58,11 +58,6 @@ export const UploadPage: React.FC = () => {
       hasError = true;
     }
 
-    if (tags.length === 0) {
-      setSkillsError('Please define at least one mandatory skill tag.');
-      hasError = true;
-    }
-
     if (hasError) return;
 
     uploadMutation.mutate(

@@ -288,3 +288,16 @@ def extract_languages_deterministically(text: str) -> List[str]:
         if re.search(r'\b' + re.escape(lang.lower()) + r'\b', text_lower):
             languages.append(lang)
     return languages
+
+def extract_skills_from_jd(jd_text: str) -> List[str]:
+    """
+    Automatically extracts all required skills, frameworks, programming languages,
+    databases, cloud platforms, and DevOps tools directly from the Job Description text.
+    """
+    if not jd_text or not jd_text.strip():
+        return []
+    
+    found_items = extract_skills_deterministically(jd_text, source="jd")
+    extracted = set(item["name"] for item in found_items)
+    
+    return sorted(list(extracted))

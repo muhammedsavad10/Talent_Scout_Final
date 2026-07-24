@@ -26,13 +26,10 @@ def test_startup_events_execute():
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
 
-def test_embedding_availability_reporting():
+def test_decision_config_availability():
     """
-    Verifies that the embedding model is available.
-    Silent fallbacks are no longer allowed.
+    Verifies that the decision engine configs are available.
     """
-    from app.agents.scout import embedding_model
-    
-    # In tests, this might be a MagicMock (via conftest.py) or the real model
-    # The key is that it's successfully loaded and has an encode method.
-    assert hasattr(embedding_model, "encode")
+    from app.agents.decision_engine import validate_decision_configs
+    validate_decision_configs()
+

@@ -336,6 +336,11 @@ class CandidateComparisonRow(BaseModel):
     strengths: List[str]
     weaknesses: List[str]
     evaluation_id: str
+    role_fit: Optional[float] = None
+    technical_match: Optional[float] = None
+    experience_alignment: Optional[float] = None
+    project_relevance: Optional[float] = None
+    evidence_confidence: Optional[float] = None
 
 class BatchEvaluationResponse(BaseModel):
     batch_id: str

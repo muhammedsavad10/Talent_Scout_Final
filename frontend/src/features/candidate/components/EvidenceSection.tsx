@@ -1,16 +1,18 @@
 import React from 'react';
 import { Card, Heading, Text } from '@/shared/ui';
 import type { SkillEvidence } from '../types/candidate';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Zap } from 'lucide-react';
 
 interface EvidenceSectionProps {
   matchedSkills: string[];
+  inferredSkills?: string[];
   missingSkills: string[];
   skillsEvidence?: Record<string, SkillEvidence>;
 }
 
 export const EvidenceSection: React.FC<EvidenceSectionProps> = ({
   matchedSkills,
+  inferredSkills = [],
   missingSkills,
   skillsEvidence = {},
 }) => {
@@ -24,7 +26,7 @@ export const EvidenceSection: React.FC<EvidenceSectionProps> = ({
           <Heading level={3} style={{ fontSize: '18px', margin: 0 }}>Validated Core Capabilities ({matchedSkills.length})</Heading>
         </div>
         <Text variant="muted">
-          Skills found in the resume matching requirements. Proof sentences are extracted from the candidate work logs.
+          Skills explicitly found in the resume matching requirements. Proof sentences are extracted from candidate work logs.
         </Text>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -67,6 +69,47 @@ export const EvidenceSection: React.FC<EvidenceSectionProps> = ({
           )}
         </div>
       </div>
+
+      {/* Inferred Foundational Skills Block */}
+      {inferredSkills.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={20} style={{ color: '#60a5fa' }} />
+            <Heading level={3} style={{ fontSize: '18px', margin: 0 }}>Logically Inferred Foundational Skills ({inferredSkills.length})</Heading>
+          </div>
+          <Text variant="muted">
+            Foundational skills logically inferred based on advanced technology prerequisites in the candidate&apos;s background (85% credit applied).
+          </Text>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {inferredSkills.map((skill) => {
+              const evidence = skillsEvidence[skill];
+              return (
+                <Card key={skill} style={{ borderLeft: '3px solid #3b82f6', background: 'rgba(59, 130, 246, 0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontWeight: 600, color: '#60a5fa', fontSize: '14px' }}>⚡ {skill} (Inferred Foundation)</span>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#60a5fa',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}>
+                      Credit: 85%
+                    </span>
+                  </div>
+                  {evidence?.context && (
+                    <Text variant="muted" style={{ fontSize: '13px', marginTop: '6px', fontStyle: 'italic', lineHeight: '1.4' }}>
+                      &ldquo;{evidence.context}&rdquo;
+                    </Text>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Missing Skills Warning Block */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

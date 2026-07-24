@@ -19,9 +19,9 @@ def test_health():
 
 def test_batch_and_poll():
     print("Testing batch submission and polling...")
-    
-    from reportlab.pdfgen import canvas
-    import io
+    with TestClient(app) as client:
+        from reportlab.pdfgen import canvas
+        import io
     
     def create_pdf(text):
         buffer = io.BytesIO()
@@ -33,7 +33,7 @@ def test_batch_and_poll():
 
     # We create real PDF files in memory to submit.
     files = [
-        ("files", ("IDEAL.pdf", create_pdf("Name: Ideal Candidate\nExperience: Senior Engineer at TechCorp (2018-present).\nEducation: BS Computer Science.\nI am a highly skilled engineer with 8 years of experience. My expertise includes Python, JavaScript, FastAPI, React, and Docker."), "application/pdf")),
+        ("files", ("IDEAL.pdf", create_pdf("Name: Ideal Candidate\nExperience: Senior Engineer at TechCorp (2018-present).\nEducation: BS Computer Science.\nI am a highly skilled engineer with 8 years of experience. My expertise includes Python, Kubernetes, FastAPI, React, and Docker."), "application/pdf")),
         ("files", ("MISSING_MANDATORY.pdf", create_pdf("Name: Missing Mandatory\nExperience: Developer at JavaShop (2019-present).\nEducation: BS IT.\nExperienced developer with 5 years of experience building enterprise systems using Java and Spring."), "application/pdf")),
         ("files", ("JUNIOR.pdf", create_pdf("Name: Junior Candidate\nExperience: Intern at Startup (2023-2024).\nEducation: BS Computer Science.\nRecent graduate looking for a junior backend role. I have 2 years of experience working on university projects using Python."), "application/pdf")),
     ]

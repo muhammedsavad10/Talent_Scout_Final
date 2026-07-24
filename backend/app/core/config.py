@@ -3,6 +3,7 @@ Core configuration module for TalentScout Enterprise.
 Handles all environment variables and application settings.
 """
 import logging
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -11,7 +12,16 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     
     # API Keys
-    GROQ_API_KEY: str
+    GROQ_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    
+    # AI Gateway Settings
+    PRIMARY_EXTRACTION_PROVIDER: str = "gemini"
+    PRIMARY_GENERATION_PROVIDER: str = "groq"
+    MAX_CONCURRENT_REQUESTS: int = 3
+    MAX_RETRIES: int = 3
+    REQUEST_TIMEOUT: float = 30.0
+    ENABLE_PROVIDER_FALLBACK: bool = True
     
     # Relational Database (Supabase / PostgreSQL)
     SUPABASE_URL: str
@@ -44,36 +54,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger("talentscout_core")
 
-import time
-from groq import Groq
-
 # Telemetry and LLM for ingestion.py
 def add_timing(*args, **kwargs):
     pass
 
 def call_llm(messages, temperature=0.0, response_format=None, max_tokens=800, stage="parsing"):
-    if not getattr(settings, "GROQ_API_KEY", None):
-        raise RuntimeError("GROQ_API_KEY not configured")
-        
-    client = Groq(api_key=settings.GROQ_API_KEY)
-    kwargs = {
-        "model": "llama-3.1-8b-instant",
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    if response_format:
-        kwargs["response_format"] = response_format
-        
-    start = time.time()
-    try:
-        response = client.chat.completions.create(**kwargs)
-        result = response.choices[0].message.content
-        record_llm_call(stage, time.time() - start)
-        return result
-    except Exception as e:
-        logger.error(f"LLM Call Failed in {stage}: {e}")
-        raise
+    """
+    Backward-compatibility wrapper delegating all calls through the central AIGateway.
+    """
+    from app.services.ai_gateway import ai_gateway
+    
+    task_type = "generation" if stage in ["interview_generation", "feedback_generation", "summary_generation", "copilot_assistant"] else "extraction"
+    return ai_gateway.execute_request(
+        messages=messages,
+        temperature=temperature,
+        response_format=response_format,
+        max_tokens=max_tokens,
+        stage=stage,
+        task_type=task_type
+    )
 
 def record_llm_call(*args, **kwargs):
     pass

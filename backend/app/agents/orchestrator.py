@@ -111,30 +111,67 @@ def _extract_current_role_and_company(work_history: list) -> str:
             return company
     return "Not Mentioned"
 
-def _build_skills_evidence(evidence_states: Dict[str, List[str]], raw_text: str, parsed_resume: Dict) -> List[Dict[str, Any]]:
+def _build_skills_evidence(evidence_states: Dict[str, Any], raw_text: str, parsed_resume: Dict) -> List[Dict[str, Any]]:
     items = []
-    for status_key, skill_list in evidence_states.items():
-        is_identified = status_key in ("MATCHED", "INFERRED")
-        status_label = "Identified" if is_identified else "Not identified"
-        strength = "High" if is_identified else "Low"
+    inferred_details = evidence_states.get("inferred_details", {})
+
+    for status_key in ("MATCHED", "INFERRED", "MISSING"):
+        skill_list = evidence_states.get(status_key, [])
+        if not isinstance(skill_list, list):
+            continue
+
         for skill_name in skill_list:
+            if status_key == "MATCHED":
+                status_label = "Identified"
+                strength = "High"
+                confidence = 100
+                reasoning = "Skill explicitly found in resume matching job requirement."
+            elif status_key == "INFERRED":
+                status_label = "Inferred Foundation"
+                strength = "Medium"
+                confidence = 85
+                inf_info = inferred_details.get(skill_name, {})
+                triggers = inf_info.get("triggered_by", [])
+                reasoning = inf_info.get("reason", f"Inferred foundation: prerequisite technology ({', '.join(triggers)}) detected.")
+            else:
+                status_label = "Not identified"
+                strength = "Low"
+                confidence = 0
+                reasoning = "Skill not explicitly found in resume or supported by prerequisite ontology."
+
             snippet = _extract_sentence_for_skill(raw_text, skill_name)
             project_name = None
+
+            # If inferred, look for snippet of triggering technology
+            lookup_skills = [skill_name]
+            if status_key == "INFERRED":
+                inf_info = inferred_details.get(skill_name, {})
+                lookup_skills.extend(inf_info.get("triggered_by", []))
+
+            for look_s in lookup_skills:
+                if snippet:
+                    break
+                snippet = _extract_sentence_for_skill(raw_text, look_s)
+
             for proj in parsed_resume.get("projects", []):
                 if isinstance(proj, dict):
                     desc = (proj.get("description") or "") + (proj.get("title") or "")
-                    if skill_name.lower() in desc.lower():
-                        project_name = proj.get("title")
-                        if not snippet:
-                            snippet = desc[:200]
-                        break
+                    for look_s in lookup_skills:
+                        if look_s.lower() in desc.lower():
+                            project_name = proj.get("title")
+                            if not snippet:
+                                snippet = desc[:200]
+                            break
+
             if not snippet:
                 for work in parsed_resume.get("work_history", []):
                     if isinstance(work, dict):
                         desc = work.get("description") or ""
-                        if skill_name.lower() in desc.lower():
-                            snippet = desc[:200]
-                            break
+                        for look_s in lookup_skills:
+                            if look_s.lower() in desc.lower():
+                                snippet = desc[:200]
+                                break
+
             items.append({
                 "skill": skill_name,
                 "status": status_label,
@@ -142,8 +179,8 @@ def _build_skills_evidence(evidence_states: Dict[str, List[str]], raw_text: str,
                 "project_name": project_name,
                 "role_held": None,
                 "evidence_strength": strength,
-                "match_confidence": 100 if is_identified else 0,
-                "reasoning": f"Skill found in resume {'and matches job requirement' if is_identified else 'but not found in resume text'}"
+                "match_confidence": confidence,
+                "reasoning": reasoning
             })
     return items
 
@@ -349,138 +386,98 @@ def _generate_recruiter_notes(parsed_resume: Dict, decision_output: Dict) -> str
     return " ".join(parts)
 
 
-async def run_evaluation_pipeline(text: str, candidate_id: str, required_skills: List[str] = None) -> Dict[str, Any]:
+def prepare_final_required_skills(jd_text: str, optional_recruiter_skills: List[str] = None) -> List[str]:
+    """
+    Primary Source: Automatically extracts skills from Job Description (jd_text).
+    Optional Source: Merges optional recruiter-entered skills (optional_recruiter_skills).
+    Deduplicates after normalization.
+    """
+    if optional_recruiter_skills is None:
+        optional_recruiter_skills = []
+
+    from app.agents.deterministic_extractor import extract_skills_from_jd
+    extracted_jd_skills = extract_skills_from_jd(jd_text)
+
+    normalized_map = {}
+    
+    # 1. Primary: Extracted JD skills
+    for sk in extracted_jd_skills:
+        if sk and isinstance(sk, str):
+            clean = sk.strip()
+            norm_k = clean.lower()
+            if norm_k not in normalized_map:
+                normalized_map[norm_k] = clean
+
+    # 2. Optional: Merge Recruiter skills
+    for sk in optional_recruiter_skills:
+        if sk and isinstance(sk, str):
+            clean = sk.strip()
+            norm_k = clean.lower()
+            if norm_k not in normalized_map:
+                normalized_map[norm_k] = clean
+
+    return list(normalized_map.values())
+
+
+from app.agents.stage1_evaluation import run_stage1_evaluation, prepare_final_required_skills
+from app.agents.stage2_intelligence import run_stage2_intelligence
+
+
+async def run_evaluation_pipeline(
+    text: str,
+    candidate_id: str,
+    required_skills: List[str] = None,
+    jd_text: str = ""
+) -> Dict[str, Any]:
     if required_skills is None:
         required_skills = []
 
     try:
-        parsed_resume = parse_resume_to_json(text)
-        if not parsed_resume:
-            return {"status": "error", "error_stage": "parser", "message": "Failed to parse resume"}
+        # Stage 1: Deterministic Evaluation Engine (Owns 100% of score calculations)
+        evaluation_data = await run_stage1_evaluation(
+            text=text,
+            candidate_id=candidate_id,
+            required_skills=required_skills,
+            jd_text=jd_text
+        )
 
-        if "error" in parsed_resume:
-            return {"status": "error", "error_stage": "parser", "message": parsed_resume["error"]}
+        if evaluation_data.get("status") == "error":
+            return evaluation_data
 
-        if "skills" in parsed_resume:
-            for cat, skills_list in parsed_resume["skills"].items():
-                if isinstance(skills_list, list):
-                    parsed_resume["skills"][cat] = normalize_skills_list(skills_list)
+        # Stage 2: Recruiter Intelligence Engine (Explanatory layer, consumes Stage 1 as read-only)
+        intelligence_data = run_stage2_intelligence(evaluation_data)
 
-        if "hard_skills" in parsed_resume:
-            parsed_resume["hard_skills"] = normalize_skills_list(parsed_resume["hard_skills"])
-
-        validation_report = validate_parsed_resume(parsed_resume)
-        if validation_report["overall_score"] < 50:
-            return {"status": "error", "error_stage": "validation", "message": "Parsed resume failed validation"}
-
-        contacts = extract_contact_info(text)
-        known_skills = extract_known_skills(text, required_skills)
-        parsed_resume["contacts"] = contacts
-
-        if "hard_skills" not in parsed_resume:
-            parsed_resume["hard_skills"] = []
-        parsed_resume["hard_skills"].extend([s for s in known_skills if s not in parsed_resume["hard_skills"]])
-        parsed_resume["hard_skills"] = normalize_skills_list(parsed_resume["hard_skills"])
-
-        decision_output = run_decision_engine(parsed_resume, required_skills)
-
-        rec_section = decision_output.get("recommendation", {})
-        rec_basis = rec_section.get("recommendation_basis", {})
-        evidence_states = decision_output.get("evidence_states", {})
-        overall = decision_output.get("overall_score", 0)
-
-        skills_evidence = _build_skills_evidence(evidence_states, text, parsed_resume)
-        career_timeline = _generate_career_timeline(parsed_resume)
-        business_impact = _generate_business_impact(parsed_resume)
-        interview_questions = _generate_interview_questions(parsed_resume, required_skills, evidence_states)
-        resume_feedback = _generate_resume_feedback(parsed_resume)
-        recruiter_notes = _generate_recruiter_notes(parsed_resume, decision_output)
-
-        reasoning_text = rec_basis.get("reasoning", "")
-        strengths = rec_basis.get("strengths", [])
-        weaknesses = rec_basis.get("weaknesses", [])
-
-        matched_skills = evidence_states.get("MATCHED", [])
-        missing_skills = evidence_states.get("MISSING", [])
-
-        # Calculate candidate facts deterministically
-        work_history = parsed_resume.get("work_history") or []
-        experience_years = _calculate_years_experience(work_history)
-        salary = _extract_salary_information(text)
-        notice_period = _extract_notice_period(text)
-        location = _extract_location(text)
-        current_employer = _extract_current_role_and_company(work_history)
-
-        candidate_facts = {
-            "current_employer": current_employer if current_employer != "Not Mentioned" else None,
-            "policy_eligible": decision_output.get("policy_eligible", False)
-        }
-
+        # Build response with strict Stage 1 ("evaluation") and Stage 2 ("recruiter_intelligence") separation
         result = {
-            "evaluation_id": candidate_id,
-            "status": "success",
-            "candidate_facts": candidate_facts,
-            "personal_info": parsed_resume.get("personal_info", {}),
-            "contacts": contacts,
-            "matched_skills": matched_skills,
-            "missing_skills": missing_skills,
-            "overall_score": overall,
-            "decision_engine": decision_output,
-            "recommendation": {
-                "hiring_recommendation": rec_section.get("hiring_recommendation", "Unknown"),
-                "rationale_bullets": reasoning_text.split("\n") if reasoning_text else [],
-                "candidate_summary": strengths,
-                "candidate_highlights": strengths[:3],
-                "disclaimer": "This assessment is based only on information present in the submitted resume."
+            "evaluation": evaluation_data,
+            "recruiter_intelligence": intelligence_data,
+            
+            # Root-level property aliases for complete backward compatibility
+            "evaluation_id": evaluation_data.get("evaluation_id"),
+            "status": evaluation_data.get("status"),
+            "candidate_facts": evaluation_data.get("candidate_facts"),
+            "personal_info": evaluation_data.get("personal_info"),
+            "contacts": evaluation_data.get("contacts"),
+            "matched_skills": evaluation_data.get("matched_skills"),
+            "inferred_skills": evaluation_data.get("inferred_skills"),
+            "missing_skills": evaluation_data.get("missing_skills"),
+            "overall_score": evaluation_data.get("overall_score"),
+            "decision_engine": {
+                "overall_score": evaluation_data.get("overall_score"),
+                "policy_eligible": evaluation_data.get("policy_validation", {}).get("policy_eligible", True),
+                "evidence_states": evaluation_data.get("evidence_states", {}),
+                "dimension_scores": evaluation_data.get("dimension_scores", {}),
+                "recommendation": intelligence_data.get("recommendation", {})
             },
-            "recommendation_basis": {
-                "strengths": strengths,
-                "weaknesses": weaknesses,
-                "critical_missing_skills": rec_basis.get("critical_missing_skills", []),
-                "domain_alignment": rec_basis.get("domain_alignment", "Unknown"),
-                "decision_reasoning": reasoning_text,
-                "reasoning": reasoning_text
-            },
-            "evidence": {
-                "skills_evidence": skills_evidence,
-                "business_impact": business_impact,
-                "career_timeline": career_timeline,
-                "timeline_title": "Chronological Career Milestones"
-            },
-            "onboarding": {
-                "estimated_ramp_up": "2-4 weeks",
-                "rationale_factors": [],
-                "learning_curve": []
-            },
-            "interview": {
-                "verify_during_interview": [],
-                "interview_questions": interview_questions
-            },
-            "recruiter": {
-                "confidence": {
-                    "skill_extraction": "High",
-                    "reasoning": "Medium",
-                    "learnability": "Medium",
-                    "evidence_justification": "Automated evaluation"
-                },
-                "resume_feedback": resume_feedback,
-                "recruiter_notes": recruiter_notes
-            },
-            "debug": {
-                "raw_weighted_score": overall / 100.0,
-                "raw_semantic_similarity": 0.0,
-                "raw_containment_score": 0.0,
-                "matched_tokens": evidence_states.get("MATCHED", []) + evidence_states.get("INFERRED", []),
-                "processing_ms": 0.0,
-                "agent_logs": [],
-                "pipeline_node_transitions": [
-                    "Parser", "Normalization", "Validation",
-                    "Scorer", "PolicyEngine", "Strategy",
-                    "EvidenceBuilder", "TimelineGenerator",
-                    "InterviewGenerator", "FeedbackGenerator"
-                ]
-            }
+            "certification_suitability": evaluation_data.get("certification_suitability"),
+            "evidence": evaluation_data.get("evidence"),
+            "recommendation": intelligence_data.get("recommendation"),
+            "recommendation_basis": intelligence_data.get("recommendation_basis"),
+            "onboarding": intelligence_data.get("onboarding"),
+            "interview": intelligence_data.get("interview"),
+            "recruiter": intelligence_data.get("recruiter")
         }
+
         return result
 
     except Exception as e:

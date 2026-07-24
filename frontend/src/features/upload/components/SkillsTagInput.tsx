@@ -42,7 +42,7 @@ export const SkillsTagInput: React.FC<SkillsTagInputProps> = ({
 
   return (
     <div className="form-group" style={{ width: '100%' }}>
-      <label className="form-label" htmlFor="skills-chip-input">Tracked Mandatory Skills</label>
+      <label className="form-label" htmlFor="skills-chip-input">Optional Recruiter Required Skills</label>
       
       {/* Tags Wrapper */}
       <div
@@ -102,7 +102,7 @@ export const SkillsTagInput: React.FC<SkillsTagInputProps> = ({
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder={tags.length === 0 ? "Type skill and press Enter (e.g. Python, FastAPI)..." : ""}
+          placeholder={tags.length === 0 ? "Optional: Add additional required skills not explicitly mentioned in the Job Description." : ""}
           style={{
             flex: 1,
             background: 'transparent',
@@ -118,7 +118,7 @@ export const SkillsTagInput: React.FC<SkillsTagInputProps> = ({
       
       {error && <span style={{ color: 'hsl(var(--destructive))', fontSize: '12px', marginTop: '4px' }}>{error}</span>}
       <Text variant="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-        Press Enter, comma (,), or click away to add chip tags.
+        Optional: Enter additional required skills to augment skills automatically extracted from the Job Description text.
       </Text>
     </div>
   );

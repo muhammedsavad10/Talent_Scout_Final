@@ -21,25 +21,7 @@ async def lifespan(app: FastAPI):
         validate_decision_configs()
         logger.info("Decision engine configurations validated successfully.")
         
-        from app.agents.scout import initialize_qdrant_collection
-        initialize_qdrant_collection()
-        logger.info("Qdrant collection check and initialization complete.")
-        
-        import time
         logger.info("Starting application...")
-        logger.info("Loading SentenceTransformer model...")
-        t0 = time.perf_counter()
-        from app.agents.scout import embedding_model
-        t1 = time.perf_counter()
-        
-        dim = getattr(embedding_model, "get_sentence_embedding_dimension", lambda: 384)()
-        device = getattr(embedding_model, "device", "CPU")
-        
-        logger.info("Embedding model loaded successfully.")
-        logger.info(f"Load time: {t1 - t0:.2f} sec")
-        logger.info(f"Embedding dimension: {dim}")
-        logger.info(f"Device: {device}")
-        
         logger.info("Application ready.")
     except Exception as e:
         logger.critical(f"Startup check failed: Qdrant/Decision config initialization failed: {e}")

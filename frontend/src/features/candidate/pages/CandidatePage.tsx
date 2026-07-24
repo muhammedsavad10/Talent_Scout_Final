@@ -9,26 +9,25 @@ import { AssistantDrawer } from '@/features/assistant/components/AssistantDrawer
 import { ROUTES } from '@/shared/constants/routes';
 import {
   ArrowLeft,
-  AlertTriangle,
-  MessageSquare,
-  Award,
-  Sparkles,
-  ThumbsUp,
-  XCircle,
-  HelpCircle
+  ShieldCheck,
+  ShieldAlert,
+  Mail,
+  Phone,
+  ExternalLink,
+  MessageSquare
 } from 'lucide-react';
 
 export const CandidatePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useCandidateDetail(id);
-  const [activeTab, setActiveTab] = useState<'overview' | 'evidence' | 'timeline' | 'interview'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'evidence' | 'interview' | 'insights' | 'timeline' | 'breakdown'>('overview');
   const [assistantOpen, setAssistantOpen] = useState(false);
 
-  // Recruiter Decision Panel State
+  // Recruiter Decision Panel Local Storage State
   const [recruiterDecision, setRecruiterDecision] = useState<'Hire' | 'Interview' | 'Hold' | 'Reject' | ''>(() => {
     return id ? (localStorage.getItem(`decision-${id}`) as any) || '' : '';
   });
-  const [overrideReason, setOverrideReason] = useState<string>(() => {
+  const [overrideReason] = useState<string>(() => {
     return id ? localStorage.getItem(`reason-${id}`) || 'Strong Technical Fit' : 'Strong Technical Fit';
   });
   const [recruiterNotes, setRecruiterNotes] = useState(() => {
@@ -43,12 +42,6 @@ export const CandidatePage: React.FC = () => {
     localStorage.setItem(`notes-${id}`, recruiterNotes);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
-  };
-
-  // Generate star rating from overall score
-  const renderStars = (scoreVal: number) => {
-    const count = scoreVal >= 90 ? 5 : scoreVal >= 80 ? 4 : scoreVal >= 70 ? 3 : 2;
-    return '★'.repeat(count) + '☆'.repeat(5 - count);
   };
 
   const handleCitationClick = (citationText: string) => {
@@ -77,13 +70,13 @@ export const CandidatePage: React.FC = () => {
     }, 150);
   };
 
-  // 1. Loading and Error Handlers
+  // Loading and Error States
   if (isLoading) {
     return (
-      <PageLayout title="Evaluating Candidate Profile..." subtitle="Wait while we pull detailed evaluations.">
+      <PageLayout title="Evaluating Candidate Profile..." subtitle="Retrieving candidate metrics and evidence trace.">
         <Card style={{ padding: '40px', textAlign: 'center' }}>
           <Loader size="md" />
-          <Text style={{ marginTop: '16px' }}>Reading candidate indexes...</Text>
+          <Text style={{ marginTop: '16px' }}>Querying candidate evaluation index...</Text>
         </Card>
       </PageLayout>
     );
@@ -91,11 +84,11 @@ export const CandidatePage: React.FC = () => {
 
   if (isError || !data) {
     return (
-      <PageLayout title="Evaluation Detail Error" subtitle="Unable to load the profile details.">
+      <PageLayout title="Evaluation Detail Error" subtitle="Unable to load the candidate profile.">
         <Card style={{ padding: '24px', border: '1px solid hsl(var(--destructive))', background: 'hsla(var(--destructive), 0.08)' }}>
           <Heading level={3} style={{ color: 'hsl(var(--destructive))' }}>Evaluation Profile Not Found</Heading>
           <Text style={{ marginTop: '8px' }}>
-            {error instanceof Error ? error.message : 'Evaluation session expired or record has been deleted.'}
+            {error instanceof Error ? error.message : 'Record may have expired or been deleted.'}
           </Text>
           <Link to={ROUTES.DASHBOARD} style={{ marginTop: '16px', display: 'inline-block' }}>
             <Button variant="secondary">Back to Dashboard</Button>
@@ -107,451 +100,530 @@ export const CandidatePage: React.FC = () => {
 
   const { result } = data;
   const name = result.personal_info?.name || 'Unknown Candidate';
-  const hireRec = result.recommendation?.hiring_recommendation || 'Interview';
-  const score = result.overall_score;
-  const isEligible = !!result.decision_engine?.policy_eligible;
+  const targetRole = (result as any).job_profile || (result.decision_engine as any)?.target_role || 'Software Engineer';
+  const overallScore = result.overall_score || (result.decision_engine as any)?.overall_score || 0;
+  const hiringRecommendation = result.recommendation?.hiring_recommendation || 'Interview';
+  const meetsPolicy = result.decision_engine?.policy_eligible ?? false;
+  const filename = (data as any).filename || (result as any).filename || 'resume.pdf';
 
-  // 2. Derive Summary details deterministically from candidate facts calculated on backend
   const career = result.evidence?.career_timeline || [];
-  const firstCareer = career[0];
   const candidateFacts = result.candidate_facts || {};
+  const currentPosition = candidateFacts.current_employer || (career[0] ? `${career[0].role || 'Engineer'} at ${career[0].company || 'Company'}` : 'Not Specified');
 
-  const currentPosition = candidateFacts.current_employer || (firstCareer ? `${firstCareer.role || 'Engineer'} at ${firstCareer.company || 'Company'}` : 'Not Mentioned');
+  // Contacts
+  const email = result.contacts?.email || result.personal_info?.email;
+  const phone = result.contacts?.phone || result.personal_info?.phone;
+  const links = (result.personal_info as any)?.links || [];
 
-  const matchedLen = result.matched_skills?.length || 0;
-  const missingLen = result.missing_skills?.length || 0;
+  // Core Deterministic Backend Scoring Metrics (Explicit Keyword Match 40%, Semantic Similarity 60%)
+  const dimensionScores = result.decision_engine?.dimension_scores || {};
+  const explicitKeywordMatchScore = dimensionScores.explicit_keyword_match?.score ?? dimensionScores.skill_match?.score ?? 0;
+  const semanticSimilarityScore = dimensionScores.semantic_similarity?.score ?? dimensionScores.role_fit?.score ?? 0;
 
-  // 3. Multi-Dimensional score breakdowns
-  const scoreBreakdown = {
-    semanticMatch: Math.min(100, Math.round(score + 8)),
-    explicitMatch: Math.round((matchedLen / (matchedLen + missingLen || 1)) * 100),
-    experienceMatch: Math.min(100, Math.round(score * 1.1)),
-    projectQuality: Math.max(60, Math.round(score - 4)),
-    businessImpact: Math.max(65, Math.round(score + 3)),
-    education: score >= 80 ? 95 : 80,
+  // Skills
+  const matchedSkills = result.matched_skills || [];
+  const inferredSkills = (result as any).evidence_states?.INFERRED || (result.decision_engine as any)?.evidence_states?.INFERRED || [];
+  const missingSkills = result.missing_skills || [];
+  const criticalMissing = result.recommendation_basis?.critical_missing_skills || [];
+  const allParsedSkills = ((result as any).parsed_resume)?.hard_skills || [];
+  const additionalSkills = allParsedSkills.filter((s: string) => !matchedSkills.includes(s) && !inferredSkills.includes(s));
+
+  // Strengths & Weaknesses
+  const strengths = result.recommendation_basis?.strengths || result.recommendation?.candidate_highlights || [];
+  const weaknesses = result.recommendation_basis?.weaknesses || [];
+  const decisionReasoning = result.recommendation_basis?.decision_reasoning || ((result.decision_engine as any)?.decision_trace ? (result.decision_engine as any).decision_trace.join(' ') : '');
+
+  // Insights & Onboarding
+  const certClassifications = result.certification_suitability?.classifications || [];
+  const rampUpEstimate = result.onboarding?.estimated_ramp_up || '2-4 weeks';
+  const learningCurve = result.onboarding?.learning_curve || [];
+
+  // Interview Questions
+  const interviewQuestions = result.interview?.interview_questions || { easy: [], medium: [], advanced: [] };
+
+  // Map skill_evidence list to record mapping
+  const skillsEvidence = result.evidence?.skills_evidence || [];
+  const skillsEvidenceRecord: Record<string, any> = {
+    ...Object.fromEntries(
+      (Array.isArray(skillsEvidence) ? skillsEvidence : []).map((item: any) => [
+        item.skill,
+        {
+          context: item.evidence_snippet,
+          confidence: item.match_confidence ? `${item.match_confidence}%` : '100%',
+          sentence: item.evidence_snippet
+        }
+      ])
+    ),
+    ...(typeof skillsEvidence === 'object' && !Array.isArray(skillsEvidence) ? skillsEvidence : {})
   };
 
-  // 4. Inferred Skill Gaps and Risks
-  const inferredInferences = [
-    {
-      skill: 'NumPy & Pandas',
-      trigger: 'TensorFlow & Machine Learning',
-      status: 'Inferred Competency (85% confidence)',
-      description: 'Not explicitly listed on resume but inferred based on advanced TensorFlow deep learning models projects.'
-    },
-    {
-      skill: 'Python Ecosystem',
-      trigger: 'FastAPI',
-      status: 'Expert Inferred Proficiency (95% confidence)',
-      description: 'Explicitly verified via production web API services and route builders.'
-    }
-  ];
+  // Timeline milestones mapping
+  const timelineMilestones = career.map((c: any) => ({
+    year: c.year || '2022',
+    role: c.role || 'Software Engineer',
+    company: c.company || 'Company',
+    details: c.details || 'Professional work history entry.'
+  }));
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Multi-Dimensional score breakdown */}
-            <Card>
-              <Heading level={3} style={{ fontSize: '16px', marginBottom: '16px', color: 'hsl(var(--primary))' }}>
-                Multi-Dimensional Alignment Breakdown
-              </Heading>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {[
-                  { label: 'Semantic Match (Contextual relevance)', val: scoreBreakdown.semanticMatch, color: '#a78bfa' },
-                  { label: 'Explicit Keyword Match (Requirement overlap)', val: scoreBreakdown.explicitMatch, color: '#f43f5e' },
-                  { label: 'Experience Score (Role seniority alignment)', val: scoreBreakdown.experienceMatch, color: '#3b82f6' },
-                  { label: 'Project Quality (Swarms complexity validation)', val: scoreBreakdown.projectQuality, color: '#10b981' },
-                  { label: 'Business Impact Fit (Measurable deliverables)', val: scoreBreakdown.businessImpact, color: '#f59e0b' },
-                  { label: 'Education Alignment (Field suitability)', val: scoreBreakdown.education, color: '#6b7280' },
-                ].map((item) => (
-                  <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                      <span style={{ fontWeight: 500, color: '#ffffff' }}>{item.label}</span>
-                      <span style={{ fontWeight: 700, color: item.color }}>{item.val}%</span>
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: 'hsl(var(--secondary))', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${item.val}%`, background: item.color, borderRadius: '4px', transition: 'width 0.8s ease' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Gap Analysis & Risks */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-              
-              {/* Ontology inferences */}
-              <Card>
-                <Heading level={3} style={{ fontSize: '16px', color: 'hsl(var(--accent))', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={18} /> Skill Inferences (Ontology-Aware)
-                </Heading>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                  {inferredInferences.map((inf, idx) => (
-                    <div key={idx} style={{ padding: '10px', background: 'hsl(var(--secondary))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                        <strong style={{ fontSize: '13px', color: '#ffffff' }}>{inf.skill}</strong>
-                        <span style={{ fontSize: '10px', fontWeight: 600, color: 'hsl(var(--accent))', background: 'hsla(var(--accent), 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
-                          {inf.status}
-                        </span>
-                      </div>
-                      <Text style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', marginTop: '4px', lineHeight: '1.4' }}>
-                        {inf.description}
-                      </Text>
-                    </div>
-                  ))}
+            {/* 2 Core Scoring Metric Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              <Card hoverable style={{ borderTop: '4px solid #3b82f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="muted" style={{ fontSize: '13px', fontWeight: 600 }}>Explicit Keyword Match</Text>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'hsla(var(--primary), 0.15)', color: 'hsl(var(--primary))', fontWeight: 700 }}>
+                    Weight: 40%
+                  </span>
                 </div>
-              </Card>
-
-              {/* Explicit keyword missing warnings */}
-              <Card>
-                <Heading level={3} style={{ fontSize: '16px', color: 'hsl(var(--destructive))', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertTriangle size={18} /> Gaps & Hard Warnings
+                <Heading level={2} style={{ fontSize: '36px', color: '#3b82f6', marginTop: '10px', marginBottom: '4px' }}>
+                  {explicitKeywordMatchScore}%
                 </Heading>
-                <ul style={{ paddingLeft: '20px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                  {result.recommendation_basis?.weaknesses.map((weak, idx) => (
-                    <li key={idx} style={{ color: 'hsl(var(--foreground))', lineHeight: '1.4' }}>
-                      <span style={{ color: 'hsl(var(--destructive))', marginRight: '6px' }}>⚠</span>
-                      {weak}
-                    </li>
-                  ))}
-                  {result.missing_skills.length > 0 && (
-                    <li style={{ color: 'hsl(var(--muted-foreground))', fontSize: '12px' }}>
-                      <strong>Missing tags:</strong> {result.missing_skills.join(', ')}
-                    </li>
-                  )}
-                </ul>
+                <Text variant="muted" style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                  {dimensionScores.explicit_keyword_match?.evidence?.[0] || `Matched ${matchedSkills.length} required JD skills.`}
+                </Text>
               </Card>
 
+              <Card hoverable style={{ borderTop: '4px solid #a78bfa' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="muted" style={{ fontSize: '13px', fontWeight: 600 }}>Semantic Similarity</Text>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: 'hsla(var(--accent), 0.15)', color: '#a78bfa', fontWeight: 700 }}>
+                    Weight: 60%
+                  </span>
+                </div>
+                <Heading level={2} style={{ fontSize: '36px', color: '#a78bfa', marginTop: '10px', marginBottom: '4px' }}>
+                  {semanticSimilarityScore}%
+                </Heading>
+                <Text variant="muted" style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                  {dimensionScores.semantic_similarity?.evidence?.[0] || 'Semantic similarity between candidate career experience and job target requirements.'}
+                </Text>
+              </Card>
             </div>
 
-            {/* Strengths card */}
+            {/* Executive Recommendation Box */}
             <Card>
-              <Heading level={3} style={{ fontSize: '16px', color: 'hsl(var(--success))', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={18} /> Top Proven Strengths
-              </Heading>
-              <ul style={{ paddingLeft: '20px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                {result.recommendation_basis?.strengths.map((str, idx) => (
-                  <li key={idx} style={{ color: 'hsl(var(--foreground))', lineHeight: '1.4' }}>
-                    <span style={{ color: 'hsl(var(--success))', marginRight: '6px' }}>✓</span>
-                    {str}
-                  </li>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <Heading level={3} style={{ fontSize: '16px' }}>Executive Recommendation Rationale</Heading>
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: 'hsla(var(--primary), 0.12)',
+                  color: 'hsl(var(--primary))'
+                }}>
+                  {hiringRecommendation}
+                </span>
+              </div>
+              <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
+                {(result.recommendation?.rationale_bullets || result.recommendation?.candidate_summary || []).map((bullet: string, idx: number) => (
+                  <li key={idx} style={{ fontSize: '13px', color: 'hsl(var(--foreground))' }}>{bullet}</li>
                 ))}
               </ul>
             </Card>
 
-            {/* Business Impact Card */}
-            <Card>
-              <Heading level={3} style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'hsl(var(--accent))' }}>
-                <Sparkles size={18} /> Extracted Business Impact
-              </Heading>
-              <ul style={{ paddingLeft: '20px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                {result.evidence?.business_impact && result.evidence.business_impact.map((impact, idx) => (
-                  <li key={idx} style={{ color: 'hsl(var(--foreground))', lineHeight: '1.4', marginBottom: '6px' }}>
-                    <strong style={{ color: 'hsl(var(--accent))', marginRight: '6px' }}>[{impact.category}]</strong>
-                    {impact.description}
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            {/* Strengths & Weaknesses */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              <Card style={{ borderLeft: '4px solid hsl(var(--success))' }}>
+                <Heading level={4} style={{ fontSize: '14px', color: 'hsl(var(--success))', marginBottom: '12px' }}>
+                  Top Candidate Strengths
+                </Heading>
+                {strengths.length > 0 ? (
+                  <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px', margin: 0 }}>
+                    {strengths.map((str: string, idx: number) => (
+                      <li key={idx} style={{ fontSize: '12px' }}>{str}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Text variant="muted" style={{ fontSize: '12px' }}>No explicit strength markers cataloged.</Text>
+                )}
+              </Card>
 
-            {/* System AI Evaluation Notes Card */}
+              <Card style={{ borderLeft: '4px solid hsl(var(--destructive))' }}>
+                <Heading level={4} style={{ fontSize: '14px', color: 'hsl(var(--destructive))', marginBottom: '12px' }}>
+                  Primary Weaknesses & Gaps
+                </Heading>
+                {weaknesses.length > 0 ? (
+                  <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px', margin: 0 }}>
+                    {weaknesses.map((w: string, idx: number) => (
+                      <li key={idx} style={{ fontSize: '12px' }}>{w}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Text variant="muted" style={{ fontSize: '12px' }}>No major weaknesses identified.</Text>
+                )}
+              </Card>
+            </div>
+          </div>
+        );
+
+      case 'skills':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <Card>
-              <Heading level={3} style={{ fontSize: '16px' }}>System AI Swarm Evaluation Notes</Heading>
-              <Text style={{ fontSize: '13px', marginTop: '8px', lineHeight: '1.6', background: 'hsl(var(--secondary))', padding: '12px 16px', borderRadius: 'var(--radius)', color: 'hsl(var(--muted-foreground))' }}>
-                {result.recruiter?.recruiter_notes || 'No notes compiled for this run.'}
-              </Text>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <Heading level={3} style={{ fontSize: '16px' }}>Technical Skill Inventory & Gap Analysis</Heading>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'hsl(var(--primary))' }}>
+                  Explicit Keyword Match: {explicitKeywordMatchScore}%
+                </span>
+              </div>
+
+              {criticalMissing.length > 0 && (
+                <div style={{ padding: '12px 16px', background: 'hsla(var(--destructive), 0.1)', border: '1px solid hsl(var(--destructive))', borderRadius: '8px', marginBottom: '20px' }}>
+                  <span style={{ fontWeight: 600, color: 'hsl(var(--destructive))', fontSize: '13px' }}>Skill Gap (Critical Missing Requirements): </span>
+                  <span style={{ fontSize: '13px', color: 'hsl(var(--foreground))' }}>{criticalMissing.join(', ')}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                <div>
+                  <Heading level={4} style={{ fontSize: '13px', color: 'hsl(var(--success))', marginBottom: '10px' }}>
+                    Matched Skills ({matchedSkills.length})
+                  </Heading>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {matchedSkills.map((s: string) => (
+                      <span key={s} style={{ padding: '4px 10px', background: 'hsla(var(--success), 0.12)', color: 'hsl(var(--success))', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}>
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {inferredSkills.length > 0 && (
+                  <div>
+                    <Heading level={4} style={{ fontSize: '13px', color: '#60a5fa', marginBottom: '10px' }}>
+                      Inferred Foundational Skills ({inferredSkills.length})
+                    </Heading>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {inferredSkills.map((s: string) => (
+                        <span key={s} title="Inferred from advanced technology prerequisite on resume" style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}>
+                          ⚡ {s} (Inferred)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Heading level={4} style={{ fontSize: '13px', color: 'hsl(var(--destructive))', marginBottom: '10px' }}>
+                    Missing Skills ({missingSkills.length})
+                  </Heading>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {missingSkills.map((s: string) => (
+                      <span key={s} style={{ padding: '4px 10px', background: 'hsla(var(--destructive), 0.12)', color: 'hsl(var(--destructive))', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}>
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {additionalSkills.length > 0 && (
+                  <div>
+                    <Heading level={4} style={{ fontSize: '13px', color: 'hsl(var(--muted-foreground))', marginBottom: '10px' }}>
+                      Additional Candidate Skills ({additionalSkills.length})
+                    </Heading>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {additionalSkills.map((s: string) => (
+                        <span key={s} style={{ padding: '4px 10px', background: 'hsl(var(--secondary))', color: 'hsl(var(--foreground))', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </Card>
           </div>
         );
 
       case 'evidence':
+        return <EvidenceSection matchedSkills={matchedSkills} inferredSkills={inferredSkills} missingSkills={missingSkills} skillsEvidence={skillsEvidenceRecord} />;
+
+      case 'interview':
+        return <InterviewPrep evaluationId={id || ''} questions={interviewQuestions} />;
+
+      case 'insights':
         return (
-          <EvidenceSection
-            matchedSkills={result.matched_skills}
-            missingSkills={result.missing_skills}
-            skillsEvidence={result.evidence?.skills_evidence ?? {}}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Certification Authority Tiers */}
+            <Card>
+              <Heading level={3} style={{ fontSize: '16px', marginBottom: '12px' }}>Certification Authority Classification</Heading>
+              {certClassifications.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {certClassifications.map((cert: any, idx: number) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'hsl(var(--secondary))', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500 }}>{cert.title}</span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: cert.tier === 'Industry-Standard' ? 'hsla(var(--success), 0.2)' : 'hsla(var(--muted-foreground), 0.2)',
+                        color: cert.tier === 'Industry-Standard' ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))'
+                      }}>
+                        {cert.tier}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Text variant="muted" style={{ fontSize: '12px' }}>No formal certifications cataloged on profile.</Text>
+              )}
+            </Card>
+
+            {/* Learning Curve & Onboarding */}
+            <Card>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <Heading level={3} style={{ fontSize: '16px' }}>Learning Curve & Estimated Ramp-Up</Heading>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'hsl(var(--primary))' }}>Ramp-up: {rampUpEstimate}</span>
+              </div>
+              {learningCurve.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {learningCurve.map((lc: any, idx: number) => (
+                    <div key={idx} style={{ padding: '10px 14px', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600 }}>
+                        <span>Skill: {lc.skill}</span>
+                        <span style={{ color: 'hsl(var(--accent))' }}>Difficulty: {lc.difficulty}</span>
+                      </div>
+                      <Text variant="muted" style={{ fontSize: '11px', marginTop: '4px' }}>{lc.reason}</Text>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Text variant="muted" style={{ fontSize: '12px' }}>No steep learning curve transitions required.</Text>
+              )}
+            </Card>
+
+            {/* Recruiter Notes & Decision Override */}
+            <Card>
+              <Heading level={3} style={{ fontSize: '16px', marginBottom: '12px' }}>Recruiter Decision & Assessment Notes</Heading>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <Text variant="muted" style={{ fontSize: '12px', marginBottom: '4px' }}>Recruiter Decision Action:</Text>
+                  <select
+                    value={recruiterDecision}
+                    onChange={(e) => setRecruiterDecision(e.target.value as any)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', border: '1px solid hsl(var(--border))' }}
+                  >
+                    <option value="">-- Select Decision --</option>
+                    <option value="Hire">Recommend Hire</option>
+                    <option value="Interview">Schedule Interview</option>
+                    <option value="Hold">Keep on Hold</option>
+                    <option value="Reject">Reject Candidate</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Text variant="muted" style={{ fontSize: '12px', marginBottom: '4px' }}>Recruiter Assessment Notes:</Text>
+                  <textarea
+                    rows={4}
+                    value={recruiterNotes}
+                    onChange={(e) => setRecruiterNotes(e.target.value)}
+                    placeholder="Enter private recruiter assessment notes..."
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', border: '1px solid hsl(var(--border))' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Button variant="primary" onClick={handleSaveDecision}>Save Recruiter Assessment</Button>
+                  {saveSuccess && <span style={{ color: 'hsl(var(--success))', fontSize: '12px', fontWeight: 600 }}>Assessment saved successfully!</span>}
+                </div>
+              </div>
+            </Card>
+          </div>
         );
 
       case 'timeline':
-        return <EvidenceTimeline timeline={result.evidence?.career_timeline || []} />;
+        return <EvidenceTimeline timeline={timelineMilestones} />;
 
-      case 'interview':
+      case 'breakdown':
         return (
-          <InterviewPrep
-            evaluationId={id!}
-            questions={result.interview?.interview_questions || []}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <Card>
+              <Heading level={3} style={{ fontSize: '16px', marginBottom: '12px', color: 'hsl(var(--primary))' }}>
+                Core Mathematical Scoring Breakdown
+              </Heading>
+              
+              <div style={{ padding: '16px', background: 'hsla(var(--primary), 0.08)', border: '1px solid hsl(var(--primary))', borderRadius: '8px', marginBottom: '20px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: 'hsl(var(--primary))' }}>
+                  Overall Score Formula:
+                </span>
+                <div style={{ fontSize: '13px', marginTop: '6px', fontFamily: 'monospace' }}>
+                  Overall Match Score = (Explicit Keyword Match × 0.40) + (Semantic Similarity × 0.60)
+                </div>
+                <div style={{ fontSize: '13px', marginTop: '4px', color: 'hsl(var(--foreground))', fontWeight: 600 }}>
+                  = ({explicitKeywordMatchScore} × 0.40) + ({semanticSimilarityScore} × 0.60) = {overallScore}%
+                </div>
+              </div>
+
+              <Text style={{ fontSize: '13px', marginBottom: '16px' }}>{decisionReasoning}</Text>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ padding: '12px', background: 'hsl(var(--secondary))', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600 }}>
+                    <span>Explicit Keyword Match</span>
+                    <span>Score: {explicitKeywordMatchScore}% (Weight: 40%)</span>
+                  </div>
+                  <Text variant="muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+                    Evidence: {dimensionScores.explicit_keyword_match?.evidence?.[0] || 'Direct ratio of required skills found.'}
+                  </Text>
+                </div>
+
+                <div style={{ padding: '12px', background: 'hsl(var(--secondary))', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 600 }}>
+                    <span>Semantic Similarity</span>
+                    <span>Score: {semanticSimilarityScore}% (Weight: 60%)</span>
+                  </div>
+                  <Text variant="muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+                    Evidence: {dimensionScores.semantic_similarity?.evidence?.[0] || 'Semantic similarity between work history and target role.'}
+                  </Text>
+                </div>
+              </div>
+            </Card>
+          </div>
         );
+
+      default:
+        return null;
     }
   };
 
   return (
     <PageLayout
       title={name}
-      subtitle={
-        <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: 'hsl(var(--muted-foreground))', marginTop: '4px' }}>
-          <span>Candidate File: {data.filename}</span>
-          <span>|</span>
-          <span style={{ color: 'hsl(var(--warning))' }}>AI Swarm recommendation: {hireRec}</span>
-        </div>
-      }
+      subtitle={`Applied Role: ${targetRole} • File: ${filename}`}
       actions={
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <Link to={ROUTES.DASHBOARD}>
-            <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowLeft size={16} /> Back
+            <Button variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowLeft size={16} /> Back to Dashboard
             </Button>
           </Link>
-          <Button
-            variant="primary"
-            onClick={() => setAssistantOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            <MessageSquare size={16} /> Ask AI Assistant
+          <Button variant="primary" onClick={() => setAssistantOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <MessageSquare size={16} /> Ask AI Copilot
           </Button>
         </div>
       }
     >
-      
-      {/* 1. Candidate Summary Hero Banner */}
-      <Card style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '16px', borderLeft: '6px solid hsl(var(--primary))' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <Heading level={2} style={{ margin: 0, fontSize: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {name}
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                background: isEligible ? 'hsla(var(--success), 0.12)' : 'hsla(var(--destructive), 0.12)',
-                color: isEligible ? 'hsl(var(--success))' : 'hsl(var(--destructive))',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-              title="Calculated deterministically: Overall score meets criteria and all mandatory skill tags matched."
-              >
-                {isEligible ? 'Meets Hiring Policy' : 'Hiring Policy Gate Failed'}
-              </span>
-            </Heading>
-            <Text style={{ fontSize: '14px', color: 'hsl(var(--accent))', fontWeight: 500, marginTop: '4px' }}>
-              {currentPosition}
-            </Text>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>{score}%</span>
-              <span style={{ color: 'hsl(var(--warning))', letterSpacing: '2px', fontSize: '16px' }}>{renderStars(score)}</span>
-            </div>
-            <span style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}>
-              Overall Swarm Alignment Score
-            </span>
-          </div>
-        </div>
-
-        {/* Simplified details grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: '16px',
-          borderTop: '1px solid hsl(var(--border))',
-          paddingTop: '16px',
-          marginTop: '4px'
-        }}>
-          <div>
-            <span style={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={12} /> AI Swarm Recommendation
-            </span>
-            <strong style={{
-              fontSize: '13px',
-              color: hireRec === 'Hire' ? 'hsl(var(--success))' : 'hsl(var(--accent))',
-              display: 'block',
-              marginTop: '2px',
-              textTransform: 'capitalize'
-            }}>
-              {hireRec} Recommended
-            </strong>
-          </div>
-        </div>
-      </Card>
-
-      {/* 2. Grid split layout (Left side Details / Right side Persistent Review Override) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '28px', width: '100%', alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
-        {/* Large screens 2-col wrapper support */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 1fr)',
-          gap: '24px',
-          alignItems: 'start'
-        }}>
-          
-          {/* Main Info Columns */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Tabs Selector Bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid hsl(var(--border))', width: '100%', gap: '8px' }}>
-              {(['overview', 'evidence', 'timeline', 'interview'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '12px 18px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: activeTab === tab ? '2px solid hsl(var(--primary))' : '2px solid transparent',
-                    color: activeTab === tab ? '#ffffff' : 'hsl(var(--muted-foreground))',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    textTransform: 'capitalize',
-                    transition: 'var(--transition)',
-                  }}
-                >
-                  {tab}
-                </button>
+        {/* Candidate Summary Header Bar */}
+        <Card style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Heading level={2} style={{ fontSize: '24px', margin: 0 }}>{name}</Heading>
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  background: meetsPolicy ? 'hsla(var(--success), 0.15)' : 'hsla(var(--destructive), 0.15)',
+                  color: meetsPolicy ? 'hsl(var(--success))' : 'hsl(var(--destructive))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  {meetsPolicy ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+                  {meetsPolicy ? 'Meets Hiring Policy' : 'Policy Gap / Disqualified'}
+                </span>
+              </div>
+              <Text variant="muted" style={{ fontSize: '13px' }}>
+                Current Position: <strong style={{ color: 'hsl(var(--foreground))' }}>{currentPosition}</strong>
+              </Text>
+            </div>
+
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+              <div style={{ textAlign: 'right' }}>
+                <Text variant="muted" style={{ fontSize: '11px' }}>Overall Match Score</Text>
+                <Heading level={2} style={{ fontSize: '32px', margin: 0, color: overallScore >= 80 ? 'hsl(var(--success))' : 'hsl(var(--accent))' }}>
+                  {overallScore}%
+                </Heading>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <Text variant="muted" style={{ fontSize: '11px' }}>Recommendation</Text>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: 'hsl(var(--primary))' }}>
+                  {hiringRecommendation}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Details Line */}
+          {(email || phone || links.length > 0) && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid hsl(var(--border))', display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '12px' }}>
+              {email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Mail size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                  <span>{email}</span>
+                </div>
+              )}
+              {phone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Phone size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                  <span>{phone}</span>
+                </div>
+              )}
+              {links.map((link: string, idx: number) => (
+                <a key={idx} href={link} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'hsl(var(--primary))', textDecoration: 'none' }}>
+                  <ExternalLink size={14} /> Link {idx + 1}
+                </a>
               ))}
             </div>
+          )}
+        </Card>
 
-            {/* View Panel */}
-            <div style={{ width: '100%' }}>
-              {renderTabContent()}
-            </div>
-          </div>
-
-          {/* Sticky Decision Right-Panel */}
-          <div style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <Card style={{ display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid hsl(var(--border))' }}>
-              <Heading level={3} style={{ fontSize: '15px', color: 'hsl(var(--primary))', margin: 0 }}>
-                Recruiter Decision Panel
-              </Heading>
-              
-              <Text variant="muted" style={{ fontSize: '12px', lineHeight: '1.4' }}>
-                Set override conclusions independently from AI recommendations to compile recruitment metrics.
-              </Text>
-
-              {/* Toggles */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '12px', color: '#ffffff' }}>Decision Choice:</span>
-                {(['Hire', 'Interview', 'Hold', 'Reject'] as const).map((opt) => (
-                  <label
-                    key={opt}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      color: '#ffffff',
-                      padding: '8px 12px',
-                      background: recruiterDecision === opt ? 'hsla(var(--primary), 0.08)' : 'transparent',
-                      border: '1px solid',
-                      borderColor: recruiterDecision === opt ? 'hsl(var(--primary))' : 'hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="recruiter-decision-sidebar"
-                      value={opt}
-                      checked={recruiterDecision === opt}
-                      onChange={() => setRecruiterDecision(opt)}
-                      style={{ cursor: 'pointer', accentColor: 'hsl(var(--primary))' }}
-                    />
-                    {opt === 'Hire' && <ThumbsUp size={14} style={{ color: 'hsl(var(--success))' }} />}
-                    {opt === 'Reject' && <XCircle size={14} style={{ color: 'hsl(var(--destructive))' }} />}
-                    {opt === 'Interview' && <HelpCircle size={14} style={{ color: 'hsl(var(--accent))' }} />}
-                    {opt}
-                  </label>
-                ))}
-              </div>
-
-              {/* Reasons Dropdown */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '12px', color: '#ffffff' }}>Override Primary Reason:</span>
-                <select
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    background: 'hsl(var(--secondary))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    color: '#ffffff',
-                    fontSize: '13px',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="Strong Technical Fit">Strong Technical Fit</option>
-                  <option value="Excellent Project Evidence">Excellent Project Evidence</option>
-                  <option value="Policy Blocked / Critical Gaps">Policy Blocked / Critical Gaps</option>
-                  <option value="Notice Period Too Long">Notice Period Too Long</option>
-                  <option value="High Salary Expectation">High Salary Expectation</option>
-                  <option value="Cultural Fit Confirmed">Cultural Fit Confirmed</option>
-                  <option value="Unsatisfactory Experience Depth">Unsatisfactory Experience Depth</option>
-                </select>
-              </div>
-
-              {/* Notes */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '12px', color: '#ffffff' }}>Recruiter Assessment Comments:</span>
-                <textarea
-                  placeholder="Enter comments on notice period, salary, strengths, or gap reviews..."
-                  value={recruiterNotes}
-                  onChange={(e) => setRecruiterNotes(e.target.value)}
-                  style={{
-                    width: '100%',
-                    minHeight: '80px',
-                    padding: '10px',
-                    background: 'hsl(var(--secondary))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    fontSize: '12px',
-                    color: '#ffffff',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    lineHeight: '1.4'
-                  }}
-                />
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                <Button variant="primary" size="sm" onClick={handleSaveDecision} style={{ width: '100%' }}>
-                  Save Recruiter Decision
-                </Button>
-                {saveSuccess && (
-                  <span style={{ fontSize: '11px', color: 'hsl(var(--success))', fontWeight: 600, textAlign: 'center', display: 'block' }}>
-                    ✓ Decision Persisted
-                  </span>
-                )}
-              </div>
-            </Card>
-          </div>
-
+        {/* 7 Recruiter Layout Tabs Navigation */}
+        <div style={{ borderBottom: '1px solid hsl(var(--border))', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'skills', label: 'Skills' },
+            { id: 'evidence', label: 'Evidence' },
+            { id: 'interview', label: 'Interview' },
+            { id: 'insights', label: 'Recruiter' },
+            { id: 'timeline', label: 'Timeline' },
+            { id: 'breakdown', label: 'Decision Breakdown' }
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id as any)}
+              style={{
+                padding: '10px 16px',
+                fontSize: '13px',
+                fontWeight: activeTab === t.id ? 600 : 400,
+                color: activeTab === t.id ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+                borderBottom: activeTab === t.id ? '2px solid hsl(var(--primary))' : '2px solid transparent',
+                background: 'none',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
+        {/* Tab Panel Render */}
+        {renderTabContent()}
+
+        {/* AI Copilot Drawer */}
+        {assistantOpen && (
+          <AssistantDrawer
+            isOpen={assistantOpen}
+            onClose={() => setAssistantOpen(false)}
+            candidateName={name}
+            candidateId={id || ''}
+            onCitationClick={handleCitationClick}
+          />
+        )}
       </div>
-
-      {/* 3. Right Drawer assistant */}
-      <AssistantDrawer
-        isOpen={assistantOpen}
-        onClose={() => setAssistantOpen(false)}
-        candidateName={name}
-        candidateId={id!}
-        onCitationClick={handleCitationClick}
-      />
-
     </PageLayout>
   );
 };
-export default CandidatePage;

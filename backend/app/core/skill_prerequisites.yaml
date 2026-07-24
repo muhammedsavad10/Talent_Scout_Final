@@ -1,0 +1,168 @@
+# TalentScout Enterprise - Skill Prerequisite, Concept Support, Equivalence & Importance Ontology Configuration
+# Defines deterministic prerequisite relationships, concept support, conservative technology equivalences, and skill importance tiers.
+
+config:
+  inference_credit_weight: 0.85        # Mid-level prerequisite credit (85%)
+  senior_inference_credit_weight: 0.90 # Senior candidate prerequisite credit (90%)
+  concept_credit_weight: 0.85          # Higher-level concept inference credit (85%)
+  equivalent_credit_weight: 0.80       # Equivalent technology credit (80%)
+  preferred_credit_weight: 0.70        # Preferred skill credit (70%)
+
+# Skill Importance Taxonomy
+critical_skills:
+  - python
+  - machine learning
+  - deep learning
+  - statistics
+  - model evaluation
+  - tensorflow
+  - pytorch
+  - java
+  - javascript
+  - c++
+  - c#
+  - sql
+
+important_skills:
+  - fastapi
+  - docker
+  - git
+  - feature engineering
+  - react
+  - node.js
+  - kubernetes
+  - aws
+  - postgresql
+  - mongodb
+
+preferred_skills:
+  - power bi
+  - tableau
+  - agile
+  - scrum
+  - kanban
+  - jira
+  - confluence
+  - qdrant
+  - mlflow
+  - airflow
+  - grafana
+
+foundational_skills:
+  - python
+  - javascript
+  - java
+  - c#
+  - c++
+  - go
+  - rust
+  - ruby
+  - php
+  - sql
+  - git
+  - docker
+  - numpy
+  - pandas
+  - html
+  - css
+  - linux
+  - bash
+  - shell
+
+prerequisites:
+  # Machine Learning & AI -> Foundational Languages & Libraries
+  tensorflow: ["Python"]
+  pytorch: ["Python"]
+  scikit-learn: ["Python", "NumPy"]
+  sklearn: ["Python", "NumPy"]
+  pandas: ["Python"]
+  numpy: ["Python"]
+  langchain: ["Python"]
+  llamaindex: ["Python"]
+  fastapi: ["Python"]
+  django: ["Python"]
+  flask: ["Python"]
+  tornado: ["Python"]
+  celery: ["Python"]
+  spark mllib: ["Apache Spark", "Python"]
+  pyspark: ["Apache Spark", "Python"]
+  hugging face: ["Python"]
+  transformers: ["Python"]
+  spacy: ["Python"]
+  nltk: ["Python"]
+  opencv: ["Python"]
+  xgboost: ["Python"]
+  lightgbm: ["Python"]
+  catboost: ["Python"]
+
+  # Frontend & Web Frameworks -> Foundational Languages
+  react: ["JavaScript"]
+  reactjs: ["JavaScript"]
+  next.js: ["React", "JavaScript"]
+  nextjs: ["React", "JavaScript"]
+  vue.js: ["JavaScript"]
+  vue: ["JavaScript"]
+  vuejs: ["JavaScript"]
+  nuxtjs: ["Vue.js", "JavaScript"]
+  angular: ["TypeScript", "JavaScript"]
+  svelte: ["JavaScript"]
+  typescript: ["JavaScript"]
+  redux: ["JavaScript"]
+
+  # Backend Frameworks -> Languages & Runtime
+  spring boot: ["Java"]
+  spring: ["Java"]
+  express.js: ["Node.js", "JavaScript"]
+  express: ["Node.js", "JavaScript"]
+  nest.js: ["Node.js", "TypeScript"]
+  asp.net core: ["C#", ".NET"]
+  asp.net: ["C#"]
+  ruby on rails: ["Ruby"]
+  rails: ["Ruby"]
+  laravel: ["PHP"]
+  gin: ["Go"]
+  fiber: ["Go"]
+  actix: ["Rust"]
+  ktor: ["Kotlin"]
+
+  # DevOps & Infrastructure -> Core Infrastructure
+  kubernetes: ["Docker"]
+  k8s: ["Docker"]
+  docker compose: ["Docker"]
+  helm: ["Kubernetes", "Docker"]
+  argocd: ["Kubernetes"]
+  istio: ["Kubernetes"]
+  cloudformation: ["AWS"]
+  aws lambda: ["AWS"]
+
+# Higher-Level Concepts Supported by Specialized Technologies or Projects
+concept_support:
+  feature engineering: ["Scikit-Learn", "XGBoost", "CatBoost", "LightGBM", "Production ML", "Data Preprocessing", "Pandas"]
+  nlp: ["Transformers", "BERT", "LLMs", "Hugging Face", "Text Classification", "RAG", "spaCy", "NLTK", "Natural Language Processing"]
+  natural language processing: ["Transformers", "BERT", "LLMs", "Hugging Face", "Text Classification", "RAG", "spaCy", "NLTK"]
+  computer vision: ["OpenCV", "PyTorch", "TensorFlow", "YOLO", "CNN", "Image Processing"]
+  mlops: ["Kubeflow", "MLflow", "Airflow", "Docker", "Model Deployment", "Model Serving"]
+
+# Conservative Equivalent Technology Groups
+equivalent_groups:
+  vector_databases:
+    - qdrant
+    - pinecone
+    - weaviate
+    - milvus
+    - chromadb
+    - faiss
+    - elasticsearch
+  cloud_storage:
+    - aws s3
+    - s3
+    - azure blob
+    - google cloud storage
+    - gcs
+  workflow_orchestration:
+    - airflow
+    - prefect
+    - dagster
+  containers:
+    - docker
+    - podman

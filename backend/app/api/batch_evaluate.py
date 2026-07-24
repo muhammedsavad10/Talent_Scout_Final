@@ -23,7 +23,7 @@ router = APIRouter()
 
 from app.agents.ingestion import extract_text_from_pdf
 
-async def process_batch(batch_id: str, files: List[UploadFile], jd_skills: List[str]):
+async def process_batch(batch_id: str, files: List[UploadFile], jd_skills: List[str], job_description: str = ""):
     total = len(files)
     completed = 0
     failed = 0
@@ -45,7 +45,12 @@ async def process_batch(batch_id: str, files: List[UploadFile], jd_skills: List[
             continue
             
         try:
-            result = await run_evaluation_pipeline(text=text, candidate_id=eval_id, required_skills=jd_skills)
+            result = await run_evaluation_pipeline(
+                text=text,
+                candidate_id=eval_id,
+                required_skills=jd_skills,
+                jd_text=job_description
+            )
             
             # Embed filename into result so comparator can pick it up
             result["filename"] = file.filename
@@ -109,7 +114,7 @@ async def batch_evaluate_stub(
     
     skills_list = [s.strip() for s in jd_skills.split(",") if s.strip()]
     
-    background_tasks.add_task(process_batch, batch_id, files, skills_list)
+    background_tasks.add_task(process_batch, batch_id, files, skills_list, job_description)
     
     return {"batch_id": batch_id, "status": "QUEUED"}
 
