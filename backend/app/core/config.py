@@ -4,7 +4,7 @@ Handles all environment variables and application settings.
 """
 import logging
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -34,10 +34,20 @@ class Settings(BaseSettings):
     # Development Flags
     DEVELOPMENT_MODE: bool = False
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "allow"
+    # Security & CORS Settings
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Returns parsed list of allowed CORS origins."""
+        origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        return origins if origins else ["http://localhost:3000", "http://localhost:5173"]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="allow"
+    )
 
 # Initialize settings
 try:

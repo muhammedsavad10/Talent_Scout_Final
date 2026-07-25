@@ -15,16 +15,21 @@ logger = logging.getLogger("talentscout_api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing database connections and Qdrant collections...")
+    logger.info("Initializing application and validating environment configuration...")
     try:
+        if not getattr(settings, "SUPABASE_URL", None) or not getattr(settings, "SUPABASE_KEY", None):
+            logger.warning("SUPABASE_URL or SUPABASE_KEY missing in environment settings.")
+        if not getattr(settings, "QDRANT_URL", None) or not getattr(settings, "QDRANT_API_KEY", None):
+            logger.warning("QDRANT_URL or QDRANT_API_KEY missing in environment settings.")
+            
         from app.agents.decision_engine import validate_decision_configs
         validate_decision_configs()
         logger.info("Decision engine configurations validated successfully.")
         
-        logger.info("Starting application...")
-        logger.info("Application ready.")
+        logger.info(f"CORS origins configured: {settings.cors_origins}")
+        logger.info("Application startup completed cleanly.")
     except Exception as e:
-        logger.critical(f"Startup check failed: Qdrant/Decision config initialization failed: {e}")
+        logger.critical(f"Startup check failed: Configuration initialization error: {e}")
         raise e
     yield
 
@@ -35,14 +40,26 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS so the React.js frontend can communicate with FastAPI
+# Configure CORS with explicit allowlist (Phase C Security Hardening)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update this to your React URL in production (e.g., localhost:3000)
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# OWASP Security Headers Middleware (Phase C Security Hardening)
+from fastapi.requests import Request
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 # Register routers
 app.include_router(ingest_router, prefix="/api/v1/ingestion", tags=["Ingestion"])
@@ -59,6 +76,36 @@ async def root():
     """
     logger.info("Health check endpoint accessed.")
     return {"message": "Welcome to the TalentScout API Gateway", "status": "healthy"}
+
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    msg = exc.detail if isinstance(exc.detail, str) else "HTTP Request Error"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error_code": f"HTTP_{exc.status_code}",
+            "message": msg,
+            "detail": msg,
+            "details": exc.detail if isinstance(exc.detail, dict) else {"detail": msg}
+        }
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled Exception on {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "An unexpected server error occurred.",
+            "details": {"error": str(exc)}
+        }
+    )
 
 @app.get("/health/databases", tags=["Health Check"])
 async def check_databases():

@@ -28,12 +28,20 @@ async def evaluate_candidate(
     Ingests a PDF resume and job parameters, executes the LangGraph multi-agent swarm,
     and returns a mathematically transparent evaluation and feedback report.
     """
-    if not file.filename.endswith(".pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
     try:
         # Read the upload stream into raw bytes for the ingestion node
         pdf_bytes = await file.read()
+        
+        # Security Hardening (Phase C): File size check (Max 5MB)
+        if len(pdf_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File size exceeds the 5MB limit.")
+            
+        # Security Hardening (Phase C): Magic Bytes validation for genuine PDF
+        if not pdf_bytes.startswith(b"%PDF"):
+            raise HTTPException(status_code=415, detail="Invalid file type. File is not a genuine PDF.")
         
         # Extract text from the PDF for the pipeline
         try:

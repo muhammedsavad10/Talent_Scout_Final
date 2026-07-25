@@ -53,22 +53,17 @@ def test_health_databases_disaster_qdrant_failure(mocker):
     
     response = client.get("/health/databases")
     assert response.status_code == 503
-    assert response.json() == {
-        "detail": "Database connection degraded."
-    }
+    assert response.json()["detail"] == "Database connection degraded."
 
 def test_health_databases_disaster_import_failure(mocker):
     """
     Test /health/databases disaster path: Database client fails to import/is not initialized.
     Ensures gateway returns 503 Service Unavailable instead of crashing.
     """
-    # Mock the module app.db.clients to raise an exception when importing its attributes
     mock_module = mocker.MagicMock()
     type(mock_module).supabase_db = mocker.PropertyMock(side_effect=Exception("Supabase connection timeout"))
     mocker.patch.dict("sys.modules", {"app.db.clients": mock_module})
     
     response = client.get("/health/databases")
     assert response.status_code == 503
-    assert response.json() == {
-        "detail": "Database connection degraded."
-    }
+    assert response.json()["detail"] == "Database connection degraded."

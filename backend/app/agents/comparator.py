@@ -61,9 +61,34 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
         hiring_priority_score = int(safe_get(hiring_priority, "hiring_priority_score", overall_score))
         hiring_priority_tier = str(safe_get(hiring_priority, "hiring_priority_tier", "Standard Review"))
 
+        cand_name = safe_get(safe_get(eval_obj, "personal_info", {}), "name", "Unknown Candidate")
+        strengths_list = safe_get(recommendation_basis, "strengths", [])
+        missing_list = safe_get(recommendation_basis, "critical_missing_skills", [])
+
+        # Structured Score Breakdown for Recruiter Trust & Explainability (Phase F)
+        score_breakdown = {
+            "stage1_match_score": float(overall_score),
+            "stage2_priority_score": float(hiring_priority_score),
+            "ats_keyword_contribution": "20.0%",
+            "semantic_match_contribution": "15.0%",
+            "role_intelligence_contribution": "15.0%",
+            "experience_depth_contribution": "20.0%",
+            "certification_quality_contribution": "12.5%",
+            "corporate_diversity_contribution": "10.0%",
+            "production_impact_contribution": "5.0%",
+            "leadership_level_contribution": "2.5%"
+        }
+
+        explanation_narrative = (
+            f"Candidate {cand_name} scored {overall_score:.1f} in Stage 1 Technical Match "
+            f"and {hiring_priority_score} in Stage 2 Hiring Priority ({hiring_priority_tier}). "
+            f"Evaluated with {len(strengths_list)} key strengths and {len(missing_list)} missing required skills."
+        )
+
         row = {
             "evaluation_id": safe_get(eval_obj, "evaluation_id", "unknown"),
-            "candidate_name": safe_get(safe_get(eval_obj, "personal_info", {}), "name", "Unknown Candidate"),
+            "candidate_id": safe_get(eval_obj, "candidate_id", "RES_000"),
+            "candidate_name": cand_name,
             "filename": safe_get(eval_obj, "filename", "unknown.pdf"),
             "recommendation_tier": safe_get(rec_section, "hiring_recommendation", "Unknown"),
             "policy_eligible": safe_get(safe_get(eval_obj, "decision_engine", {}), "policy_eligible", False),
@@ -71,6 +96,8 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
             "hiring_priority_score": hiring_priority_score,
             "hiring_priority_tier": hiring_priority_tier,
             "hiring_priority": hiring_priority,
+            "score_breakdown": score_breakdown,
+            "explanation_narrative": explanation_narrative,
             "explicit_keyword_match": extract_dimension_score(dimensions, "explicit_keyword_match") or extract_dimension_score(dimensions, "skill_match"),
             "semantic_similarity": extract_dimension_score(dimensions, "semantic_similarity") or extract_dimension_score(dimensions, "role_fit"),
             "skill_match": extract_dimension_score(dimensions, "skill_match"),
@@ -83,9 +110,9 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
             "experience_alignment": extract_dimension_score(dimensions, "experience_alignment"),
             "project_relevance": extract_dimension_score(dimensions, "project_relevance"),
             "evidence_confidence": extract_dimension_score(dimensions, "evidence_confidence"),
-            "critical_missing": safe_get(recommendation_basis, "critical_missing_skills", []),
+            "critical_missing": missing_list,
             "required_missing": [], 
-            "strengths": safe_get(recommendation_basis, "strengths", []),
+            "strengths": strengths_list,
             "weaknesses": safe_get(recommendation_basis, "weaknesses", [])
         }
         valid_candidates.append(row)
