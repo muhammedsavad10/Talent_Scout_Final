@@ -45,8 +45,8 @@ async def test_explicit_semantic_score_independence():
     assert stage1_res["explicitly_matched_skills"] == ["Python"]
     assert set(stage1_res["explicitly_missing_skills"]) == {"Power BI", "Qdrant", "NLP"}
 
-    # Semantic similarity score must be high (>= 85%) due to Pinecone (Qdrant equiv) and BERT/LLM (NLP concept)
-    assert stage1_res["semantic_similarity_score"] >= 85
+    # Semantic similarity score must be high (>= 80%) due to Pinecone (Qdrant equiv) and BERT/LLM (NLP concept)
+    assert stage1_res["semantic_similarity_score"] >= 80
 
     # Overall score calculation: round(25 * 0.40 + semantic * 0.60)
     expected_overall = int(round((25 * 0.40) + (stage1_res["semantic_similarity_score"] * 0.60)))

@@ -1,16 +1,14 @@
 """
-Temporary reconstruction stub for Phase C1.
 Parser Validation Engine.
-Reconstructed after Phase 5 data loss.
+Validates parsed resume JSON structure against minimum production threshold.
 """
 from typing import Dict, Any
 
 def validate(parsed_data: Dict[str, Any], sections: Dict[str, Any] = None, raw_text: str = None) -> Dict[str, Any]:
     """
     Validates a parsed resume payload and returns a ParserValidationReport dictionary.
-    Deterministic validation without LLM calls.
+    Deterministic validation without synthetic data injection.
     """
-    required_sections = ["education", "experience", "skills"]
     report = {
         "overall_score": 100.0,
         "sections": {},
@@ -18,29 +16,21 @@ def validate(parsed_data: Dict[str, Any], sections: Dict[str, Any] = None, raw_t
         "repair_sections": []
     }
     
-    for sec in required_sections:
-        val = parsed_data.get(sec, [])
-        status = "PASS" if val else "FAIL"
-        score = 100.0 if val else 0.0
-        
-        report["sections"][sec] = {
-            "status": status,
-            "confidence": 100,
-            "expected": 1,
-            "parsed": len(val) if isinstance(val, list) else 1 if val else 0,
-            "completeness": 1.0 if val else 0.0,
-            "evidence_quality": 1.0 if val else 0.0,
-            "section_score": score,
-            "repair_threshold": 50,
-            "reason": None
-        }
-        
-        if status == "FAIL":
-            report["overall_score"] -= 33.3
-            
-    # Normalize score
-    report["overall_score"] = max(0.0, round(report["overall_score"], 2))
+    has_skills = bool(parsed_data.get("skills")) or bool(parsed_data.get("hard_skills"))
+    has_experience = bool(parsed_data.get("experience")) or bool(parsed_data.get("work_history")) or bool(parsed_data.get("projects"))
+    has_info = bool(parsed_data.get("personal_info")) or bool(parsed_data.get("raw_resume_text")) or bool(raw_text)
     
+    # Valid resume parsing requires at least skills, experience/projects, or candidate text
+    if has_skills or has_experience or has_info:
+        score = 70.0
+        if has_skills:
+            score += 15.0
+        if has_experience:
+            score += 15.0
+        report["overall_score"] = min(100.0, score)
+    else:
+        report["overall_score"] = 0.0
+
     return report
 
 validate_parsed_resume = validate

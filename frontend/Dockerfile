@@ -1,29 +1,23 @@
-# Stage 1: Build the React Application
-FROM node:20-alpine AS build
+# Multi-Stage Dockerfile for TalentScout Enterprise Frontend
+# Stage 1: Build Static Assets
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency mappings
 COPY package*.json ./
+RUN npm ci
 
-# Install npm modules
-RUN npm ci --legacy-peer-deps
-
-# Copy workspace source files
 COPY . .
-
-# Run production compilation build
 RUN npm run build
 
-# Stage 2: Serve static files via Nginx
-FROM nginx:alpine
+# Stage 2: NGINX Alpine Web Server Runtime
+FROM nginx:alpine AS runner
 
-# Copy built frontend assets from builder stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Overwrite default Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

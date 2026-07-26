@@ -56,13 +56,20 @@ SUMMARY_REJECT_KEYWORDS = [
     "optimizing", "workflows", "seeking", "opportunities", "proficient in", "worked on",
     "responsible for", "experienced in", "developing", "implementing", "spearheaded",
     "portfolio", "summary", "passionate", "enthusiastic", "skills include", "hands-on experience",
-    "ctc", "lpa", "salary", "stipend", "compensation", "per month", "per annum", "l/month", "lakhs"
+    "ctc", "lpa", "salary", "stipend", "compensation", "per month", "per annum", "lakhs",
+    "built", "designed", "implemented", "developed", "engineered", "integrated", "optimized",
+    "created", "configured", "deployed"
 ]
 
 MONTH_MAP = {
     "jan": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr",
     "may": "May", "jun": "Jun", "jul": "Jul", "aug": "Aug",
     "sep": "Sep", "oct": "Oct", "nov": "Nov", "dec": "Dec"
+}
+
+ACTION_VERBS = {
+    "built", "designed", "implemented", "developed", "engineered",
+    "integrated", "optimized", "created", "configured", "deployed"
 }
 
 CERT_ALIAS_MAP = [
@@ -81,15 +88,21 @@ CERT_ALIAS_MAP = [
 
 def is_valid_certification_text(text: str) -> Tuple[bool, str]:
     """
-    Phase 1: Strict Certification Validator.
-    Rejects summary paragraphs, contact information, URLs, emails, phone numbers, and sentence fragments.
+    Phase 1 & v1.7.0: Strict Certification Validator.
+    Rejects summary paragraphs, project action verbs, URLs, emails, phone numbers, and sentence fragments.
     """
     if not isinstance(text, str) or not text.strip():
         return False, "Empty text"
 
     s = text.strip()
-
     words = s.split()
+    if not words:
+        return False, "Empty text"
+
+    first_word = words[0].lower().strip(":-.,")
+    if first_word in ACTION_VERBS:
+        return False, f"Starts with action verb '{first_word}'"
+
     if len(words) > 18 or len(s) > 140:
         return False, "Exceeds reasonable certification length"
 
@@ -101,8 +114,11 @@ def is_valid_certification_text(text: str) -> Tuple[bool, str]:
         return False, "Contains contact info"
 
     s_lower = s.lower()
+    if any(k in s_lower for k in ["internship", "intern ", "work history", "job ", "employment"]):
+        return False, "Internship or Employment entry inside certifications"
+
     for kw in SUMMARY_REJECT_KEYWORDS:
-        if kw in s_lower:
+        if kw in s_lower and not any(valid in s_lower for valid in ["aws certified", "google certified", "certified data scientist"]):
             return False, f"Contains summary verb/keyword '{kw}'"
 
     if any(loc in s_lower for loc in ["trivandrum", "kochi", "bangalore", "chennai", "mumbai", "pincode"]):

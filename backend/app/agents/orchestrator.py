@@ -466,6 +466,8 @@ async def run_evaluation_pipeline(
             "overall_score": evaluation_data.get("overall_score"),
             "hiring_priority": hp_data,
             "hiring_priority_score": hp_data.get("hiring_priority_score"),
+            "evidence_confidence": hp_data.get("evidence_confidence", 0.95),
+            "project_complexity": hp_data.get("project_complexity", 0.0),
             "professional_profile": hp_data.get("professional_profile", {}),
             "certifications": hp_data.get("certifications", []),
             "production_indicators": hp_data.get("production_indicators", []),
@@ -490,7 +492,8 @@ async def run_evaluation_pipeline(
             "recruiter": intelligence_data.get("recruiter")
         }
 
-        return result
+        from app.core.consistency_validator import validate_api_response_consistency
+        return validate_api_response_consistency(result)
 
     except Exception as e:
         logger.exception("Pipeline failed unexpectedly")

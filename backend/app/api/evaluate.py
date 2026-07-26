@@ -80,6 +80,8 @@ async def evaluate_candidate(
             "status": "COMPLETED",
             "result": final_state
         }
+        from app.core.consistency_validator import validate_final_api_response
+        full_eval = validate_final_api_response(full_eval)
         await evaluation_store.save_evaluation(candidate_id, full_eval)
         
         return full_eval
@@ -98,7 +100,8 @@ async def get_evaluation_status(evaluation_id: str):
     eval_data = await evaluation_store.get_evaluation(evaluation_id)
     if not eval_data:
         raise HTTPException(status_code=404, detail="Evaluation not found.")
-    return eval_data
+    from app.core.consistency_validator import validate_final_api_response
+    return validate_final_api_response(eval_data)
 
 @router.post("/email/generate")
 async def generate_email(payload: dict):

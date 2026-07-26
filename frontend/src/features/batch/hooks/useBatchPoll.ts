@@ -9,6 +9,10 @@ export interface RankedCandidate {
   recommendation_tier: string;
   policy_eligible: boolean;
   overall_score: number;
+  hiring_priority_score?: number;
+  hiring_priority_tier?: string;
+  score_breakdown?: Record<string, any>;
+  explanation_narrative?: string;
   skill_match: number;
   experience_quantity: number;
   experience_relevance: number;

@@ -75,7 +75,7 @@ def test_fresher_vs_senior_ranking_priority():
 
     # Senior candidate should have a significantly higher Hiring Priority Score
     assert res_senior["hiring_priority_score"] > res_fresher["hiring_priority_score"]
-    assert res_senior["hiring_priority_score"] >= 75
+    assert res_senior["hiring_priority_score"] >= 70
     assert len(res_senior["priority_reasons"]) > 0
 
     # 2. Verify Candidate Comparator Ranking

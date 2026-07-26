@@ -209,6 +209,10 @@ async def run_stage1_evaluation(
     if "hard_skills" in parsed_resume:
         parsed_resume["hard_skills"] = normalize_skills_list(parsed_resume["hard_skills"])
 
+    if "projects" in parsed_resume and isinstance(parsed_resume["projects"], list):
+        from app.core.project_deduplicator import deduplicate_projects
+        parsed_resume["projects"] = deduplicate_projects(parsed_resume["projects"])
+
     validation_report = validate_parsed_resume(parsed_resume)
     if validation_report["overall_score"] < 50:
         return {"status": "error", "error_stage": "stage1_validation", "message": "Parsed resume failed validation"}

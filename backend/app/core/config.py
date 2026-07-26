@@ -2,6 +2,7 @@
 Core configuration module for TalentScout Enterprise.
 Handles all environment variables and application settings.
 """
+import os
 import logging
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,9 +18,10 @@ class Settings(BaseSettings):
     
     # AI Gateway Settings
     PRIMARY_EXTRACTION_PROVIDER: str = "gemini"
-    PRIMARY_GENERATION_PROVIDER: str = "groq"
+    PRIMARY_GENERATION_PROVIDER: str = "gemini"
+    PRIMARY_ASSISTANT_PROVIDER: str = "gemini"
     MAX_CONCURRENT_REQUESTS: int = 3
-    MAX_RETRIES: int = 3
+    MAX_RETRIES: int = 2
     REQUEST_TIMEOUT: float = 30.0
     ENABLE_PROVIDER_FALLBACK: bool = True
     
@@ -44,7 +46,11 @@ class Settings(BaseSettings):
         return origins if origins else ["http://localhost:3000", "http://localhost:5173"]
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.env"),
+            ".env",
+            "talent_scout_enterprise/backend/.env"
+        ),
         case_sensitive=True,
         extra="allow"
     )

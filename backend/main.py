@@ -49,12 +49,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OWASP Security Headers Middleware (Phase C Security Hardening)
+# OWASP Security Headers & Observability Middleware (Phase C & H)
+import uuid
+import time
 from fastapi.requests import Request
+from fastapi.responses import Response, JSONResponse
+from app.core.metrics import metrics_collector
 
 @app.middleware("http")
-async def add_security_headers(request: Request, call_next):
+async def add_security_headers_and_observability(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    correlation_id = request.headers.get("X-Correlation-ID", request_id)
+    start_time = time.time()
+    
     response = await call_next(request)
+    
+    duration = time.time() - start_time
+    metrics_collector.record_request(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=response.status_code,
+        duration=duration
+    )
+    
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
@@ -70,15 +89,39 @@ app.include_router(batch_evaluate_router, prefix="/api/v1/evaluate", tags=["Batc
 async def root():
     """
     Root endpoint to verify API health.
-    
-    Returns:
-        dict: A welcome message and status.
     """
     logger.info("Health check endpoint accessed.")
     return {"message": "Welcome to the TalentScout API Gateway", "status": "healthy"}
 
-from fastapi.responses import JSONResponse
-from fastapi.requests import Request
+@app.get("/health/liveness", tags=["Health Check"])
+async def liveness_probe():
+    """
+    Kubernetes / Docker liveness probe to verify application process status.
+    """
+    return {"status": "alive", "service": "talentscout-api"}
+
+@app.get("/health/readiness", tags=["Health Check"])
+async def readiness_probe():
+    """
+    Kubernetes / Docker readiness probe to verify service capacity to accept traffic.
+    """
+    try:
+        from app.agents.decision_engine import validate_decision_configs
+        validate_decision_configs()
+        return {"status": "ready", "service": "talentscout-api"}
+    except Exception as e:
+        logger.error(f"Readiness probe failed: {e}")
+        raise HTTPException(status_code=503, detail="Service not ready.")
+
+@app.get("/metrics", tags=["Observability"])
+async def get_metrics():
+    """
+    Exposes Prometheus-formatted operational metrics.
+    """
+    return Response(
+        content=metrics_collector.generate_prometheus_text(),
+        media_type="text/plain; version=0.0.4"
+    )
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -113,17 +156,17 @@ async def check_databases():
     Endpoint to verify connections to Supabase and Qdrant.
     """
     try:
-        # Import inside the function to avoid circular logic during startup failures
         from app.db.clients import supabase_db, qdrant_db
-        
-        # Simple ping to Qdrant to ensure it's alive
-        collections = qdrant_db.get_collections()
-        
+        collections_count = 0
+        if qdrant_db and hasattr(qdrant_db, "get_collections"):
+            collections = qdrant_db.get_collections()
+            collections_count = len(collections.collections)
+            
         return {
             "status": "healthy", 
-            "supabase": "connected", 
-            "qdrant": "connected",
-            "qdrant_collections": len(collections.collections)
+            "supabase": "connected" if supabase_db else "local_fallback", 
+            "qdrant": "connected" if qdrant_db else "local_fallback",
+            "qdrant_collections": collections_count
         }
     except Exception as e:
         logger.error(f"Database health check failed: {e}")

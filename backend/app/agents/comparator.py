@@ -104,12 +104,12 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
             "experience_quantity": extract_dimension_score(dimensions, "experience_quantity"),
             "experience_relevance": extract_dimension_score(dimensions, "experience_relevance"),
             "experience_quality": extract_dimension_score(dimensions, "experience_quality"),
-            "project_complexity": extract_dimension_score(dimensions, "project_complexity"),
+            "project_complexity": float(safe_get(hiring_priority, "project_complexity", 0.0)),
             "role_fit": extract_dimension_score(dimensions, "role_fit"),
             "technical_match": extract_dimension_score(dimensions, "technical_match"),
             "experience_alignment": extract_dimension_score(dimensions, "experience_alignment"),
             "project_relevance": extract_dimension_score(dimensions, "project_relevance"),
-            "evidence_confidence": extract_dimension_score(dimensions, "evidence_confidence"),
+            "evidence_confidence": float(safe_get(hiring_priority, "evidence_confidence", 0.95)),
             "critical_missing": missing_list,
             "required_missing": [], 
             "strengths": strengths_list,
@@ -120,10 +120,14 @@ def compare_candidates(evaluations: List[Any]) -> List[Dict[str, Any]]:
     # Sort valid candidates primarily by Stage 2 hiring_priority_score, with Stage 1 overall_score as tiebreaker
     valid_candidates.sort(key=lambda x: (x["hiring_priority_score"], x["overall_score"]), reverse=True)
     
-    # Assign ranks
+    # Assign ranks and generate recruiter explainability statements
     ranked = []
     for i, cand in enumerate(valid_candidates):
         cand["rank"] = i + 1
+        if cand["rank"] == 1:
+            cand["ranking_explanation"] = f"Ranked #1 due to dominant Technical Match ({cand['overall_score']:.1f}%) and direct Role Fit ({cand['hiring_priority_tier']})."
+        else:
+            cand["ranking_explanation"] = f"Ranked #{cand['rank']} based on combined Technical Match ({cand['overall_score']:.1f}%) and Role Relevance."
         ranked.append(cand)
         
     # Append failed candidates at the bottom with rank 999

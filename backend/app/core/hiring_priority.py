@@ -501,8 +501,21 @@ def extract_candidate_evidence(eval_obj: Dict[str, Any], parsed_resume: Optional
 
     professional_exp = []
     internships = []
+    personal_projects = []
     companies = []
     seen_companies = set()
+
+    # Separate Personal & Academic Projects
+    projects_raw = parsed_res.get("projects") or result.get("projects") or eval_obj.get("projects") or []
+    if isinstance(projects_raw, list):
+        for p in projects_raw:
+            if isinstance(p, dict):
+                title = str(p.get("title") or p.get("name") or "").strip()
+                desc = str(p.get("description") or p.get("details") or "").strip()
+                if title or desc:
+                    personal_projects.append({"title": title, "description": desc})
+
+    from app.agents.evidence_classifier import classify_experience_type, ExperienceCategory, KNOWN_PROJECT_TITLES
 
     for item in raw_work:
         if not isinstance(item, dict):
@@ -512,7 +525,16 @@ def extract_candidate_evidence(eval_obj: Dict[str, Any], parsed_resume: Optional
         dates = str(item.get("dates") or item.get("duration") or "").strip()
         desc = str(item.get("description") or "").strip()
 
-        if comp and comp.lower() not in seen_companies:
+        exp_cat = classify_experience_type(comp, role, desc, source_section="experience")
+
+        if exp_cat in [ExperienceCategory.PERSONAL_PROJECT, ExperienceCategory.ACADEMIC_PROJECT] or comp.lower() in KNOWN_PROJECT_TITLES:
+            title = comp if comp and comp.lower() not in KNOWN_PROJECT_TITLES else role
+            if not title:
+                title = comp
+            personal_projects.append({"title": title or "Project", "description": desc})
+            continue
+
+        if comp and comp.lower() not in seen_companies and comp.lower() not in KNOWN_PROJECT_TITLES:
             seen_companies.add(comp.lower())
             companies.append(comp)
 
@@ -524,21 +546,14 @@ def extract_candidate_evidence(eval_obj: Dict[str, Any], parsed_resume: Optional
             "current": any(term in dates.lower() for term in ["present", "current", "now", "active"])
         }
 
-        if "intern" in role.lower() or "trainee" in role.lower() or "apprentice" in role.lower():
+        if exp_cat == ExperienceCategory.INTERNSHIP or "intern" in role.lower():
             internships.append(entry)
-        elif role or comp:
+        elif exp_cat in [ExperienceCategory.PROFESSIONAL_EMPLOYMENT, ExperienceCategory.FREELANCE, ExperienceCategory.CONSULTING]:
             professional_exp.append(entry)
 
-    # Separate Personal & Academic Projects
-    projects_raw = parsed_res.get("projects") or result.get("projects") or eval_obj.get("projects") or []
-    personal_projects = []
-    if isinstance(projects_raw, list):
-        for p in projects_raw:
-            if isinstance(p, dict):
-                title = str(p.get("title") or p.get("name") or "").strip()
-                desc = str(p.get("description") or p.get("details") or "").strip()
-                if title or desc:
-                    personal_projects.append({"title": title, "description": desc})
+    # v1.8.2 Origin-Based Canonical Entity Graph Deduplication
+    from app.core.project_deduplicator import deduplicate_projects
+    personal_projects = deduplicate_projects(personal_projects)
 
     # Consolidated Raw Text Buffer Across ALL Sections
     text_parts = []
@@ -804,15 +819,21 @@ def compute_hiring_priority_score(
     stage1_match_score = float(result.get("overall_score", 0))
 
     evidence = extract_candidate_evidence(eval_obj, parsed_resume=parsed_resume)
-    prof_exp = evidence.professional_experience
+    prof_exp_raw = evidence.professional_experience
     internships = evidence.internships
     personal_projects = evidence.personal_projects
     certs = evidence.certifications
     lead_indicators = evidence.leadership_mentorship
     prod_indicators = evidence.production_engineering
-    companies = evidence.companies
 
-    total_prof_years = compute_years_from_professional_exp(prof_exp)
+    from app.core.experience_calculator import calculate_professional_experience
+    exp_metrics = calculate_professional_experience(prof_exp_raw, internships)
+
+    prof_exp = exp_metrics["valid_employment"]
+    total_prof_years = exp_metrics["total_professional_years"]
+    companies = exp_metrics["company_diversity"]
+    current_company = exp_metrics["current_company"]
+    current_role = exp_metrics["current_role"]
 
     prof_pts, prof_reason = score_professional_experience(prof_exp, total_prof_years)
     seniority_pts, seniority_reason = score_seniority_level(prof_exp)
@@ -822,8 +843,21 @@ def compute_hiring_priority_score(
     leadership_pts, leadership_reason = score_leadership_mentorship(lead_indicators)
     cert_pts, cert_reason = score_structured_certifications(certs)
 
+    # If candidate has zero professional employment but strong projects, format recruiter explanation
+    if len(prof_exp) == 0 and len(personal_projects) > 0:
+        prof_reason = "Strong portfolio of technically advanced personal AI projects demonstrating production engineering capability, but limited or no verified professional employment."
+
+    # Phase 8 & 9: Role Relevance & Domain Matching Engine (v1.5)
+    from app.core.role_relevance import calculate_role_and_domain_relevance
+    candidate_skills = list(parsed_res.get("hard_skills") or [])
+    role_relevance_score = calculate_role_and_domain_relevance(prof_exp, candidate_skills, jd_title="Data Scientist")
+
     raw_career_priority = prof_pts + seniority_pts + prod_pts + progression_pts + maturity_pts + leadership_pts + cert_pts
     raw_career_priority = min(100.0, max(0.0, round(raw_career_priority, 1)))
+
+    # Scale raw career priority by role relevance multiplier so non-matching titles CANNOT overpower technical match
+    relevance_multiplier = 0.30 + (0.70 * (role_relevance_score / 100.0))
+    effective_career_priority = raw_career_priority * relevance_multiplier
 
     prerequisite_met = stage1_match_score >= MIN_STAGE1_PREREQUISITE_THRESHOLD
 
@@ -832,16 +866,18 @@ def compute_hiring_priority_score(
         tier = "Low Priority (Unmatched Prerequisites)"
         risk = "High"
         reasons = [
-            f"Stage 1 technical match score ({stage1_match_score:.1f}%) is below the minimum prerequisite threshold ({MIN_STAGE1_PREREQUISITE_THRESHOLD:.1f}%)."
+            f"Stage 1 technical match score ({stage1_match_score:.1f}%) is below the minimum prerequisite threshold ({MIN_STAGE1_PREREQUISITE_THRESHOLD:.1f}%).",
+            prof_reason
         ]
     else:
-        hiring_priority_score = int(round((raw_career_priority * 0.60) + (stage1_match_score * 0.40)))
+        # Rebalanced Recruiter-Grounded Formula: 70% Stage 1 Technical Match + 30% Role-Scaled Career Intelligence
+        hiring_priority_score = int(round((stage1_match_score * 0.70) + (effective_career_priority * 0.30)))
         hiring_priority_score = min(100, max(0, hiring_priority_score))
 
-        if hiring_priority_score >= 85:
+        if hiring_priority_score >= 80:
             tier = "Top Priority Interview"
             risk = "Low"
-        elif hiring_priority_score >= 70:
+        elif hiring_priority_score >= 68:
             tier = "Priority Interview"
             risk = "Low-Medium"
         elif hiring_priority_score >= 50:
@@ -863,6 +899,12 @@ def compute_hiring_priority_score(
         if leadership_pts > 1.0:
             reasons.append(leadership_reason)
 
+    # Phase 9: Canonical Resume Validation & Consistency Check
+    from app.models.canonical_resume import CanonicalResume
+    from app.core.consistency_validator import validate_canonical_resume_consistency
+    canonical = CanonicalResume.from_dict(parsed_res or {})
+    canonical = validate_canonical_resume_consistency(canonical)
+
     fine_grained_evidence = {
         "professional_experience": {"points": prof_pts, "reason": prof_reason},
         "seniority_alignment": {"points": seniority_pts, "reason": seniority_reason},
@@ -875,14 +917,16 @@ def compute_hiring_priority_score(
 
     professional_profile = {
         "candidate_name": candidate_name,
-        "professional_experience_count": len(prof_exp),
+        "professional_experience_count": exp_metrics["professional_experience_count"],
         "internship_count": len(internships),
         "personal_project_count": len(personal_projects),
         "certification_count": len(certs),
         "company_diversity": companies,
-        "current_role": prof_exp[0]["title"] if prof_exp else "None",
-        "current_company": prof_exp[0]["company"] if prof_exp else "None",
-        "total_professional_years": total_prof_years
+        "current_role": current_role,
+        "current_company": current_company,
+        "total_professional_years": total_prof_years,
+        "evidence_confidence": canonical.evidence_confidence,
+        "project_complexity": canonical.project_complexity
     }
 
     employment_history = prof_exp + internships
@@ -906,18 +950,8 @@ def compute_hiring_priority_score(
     logger.info("Evidence Certifications (%d): %s", len(certs), certs)
     logger.info("Evidence Production Indicators (%d): %s", len(prod_indicators), prod_indicators)
     logger.info("Evidence Personal Projects (%d): %s", len(personal_projects), personal_projects)
+    logger.info("Evidence Confidence: %.2f | Project Complexity: %.1f", canonical.evidence_confidence, canonical.project_complexity)
     logger.info("====================================")
-
-    logger.info("========== EXTRACTION DIAGNOSTICS: %s ==========", candidate_name)
-    logger.info("Companies (%d): %s", len(companies), ", ".join(companies))
-    logger.info("Professional Roles (%d): %s", len(prof_exp), ", ".join([r.get("title", "") for r in prof_exp]))
-    logger.info("Internships (%d): %s", len(internships), ", ".join([r.get("title", "") for r in internships]))
-    logger.info("Projects (%d): %s", len(personal_projects), ", ".join([p.get("title", "") for p in personal_projects]))
-    logger.info("Certifications (%d): %s", len(certs), ", ".join([c.get("name", c.get("title", "")) if isinstance(c, dict) else str(c) for c in certs]))
-    logger.info("Production Indicators (%d): %s", len(prod_indicators), ", ".join(prod_indicators))
-    logger.info("Leadership: %s", ", ".join(lead_indicators) if lead_indicators else "Individual Contributor")
-    logger.info("Current Employer: %s | Current Role: %s", prof_exp[0]["company"] if prof_exp else "None", prof_exp[0]["title"] if prof_exp else "None")
-    logger.info("==========================================================")
 
     # Serializer Validation Assertions: Guard against silent data loss
     assert professional_profile["personal_project_count"] == len(evidence.personal_projects), f"Mismatch in personal_project_count: {professional_profile['personal_project_count']} vs {len(evidence.personal_projects)}"
@@ -939,5 +973,7 @@ def compute_hiring_priority_score(
         "certifications": certs,
         "production_indicators": prod_indicators,
         "personal_projects": personal_projects,
-        "priority_factors": factors
+        "priority_factors": factors,
+        "evidence_confidence": canonical.evidence_confidence,
+        "project_complexity": canonical.project_complexity
     }

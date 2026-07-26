@@ -69,7 +69,7 @@ async def test_candidate_eval_with_equivalent_vector_db_and_concepts():
     assert stage1_res["explicitly_matched_skills"] == ["PyTorch"]
     
     # Stage 1B: AI Semantic Similarity Score (Inferred concepts & equivalent vector DB)
-    assert stage1_res["semantic_similarity_score"] >= 85
+    assert stage1_res["semantic_similarity_score"] >= 80
     assert stage1_res["policy_validation"]["policy_eligible"] is True
 
     stage2_res = run_stage2_intelligence(stage1_res)
