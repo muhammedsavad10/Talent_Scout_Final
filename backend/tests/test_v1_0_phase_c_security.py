@@ -22,6 +22,14 @@ def test_phase_c_owasp_security_headers():
     assert "max-age=31536000" in headers.get("Strict-Transport-Security", "")
     assert headers.get("Content-Security-Policy") == "default-src 'self'"
 
+def test_phase_c_swagger_docs_csp_allowed():
+    """Verify Swagger docs endpoint receives tailored CSP permitting jsDelivr CDN assets."""
+    response = client.get("/docs")
+    assert response.status_code == 200
+    csp = response.headers.get("Content-Security-Policy", "")
+    assert "https://cdn.jsdelivr.net" in csp
+    assert "'unsafe-inline'" in csp
+
 def test_phase_c_valid_resume_text_allowed():
     """Verify standard candidate text and technical tags pass cleanly without alteration."""
     raw_text = "Senior React Developer with experience in <div className='App'> components."

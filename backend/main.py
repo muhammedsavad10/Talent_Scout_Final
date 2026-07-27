@@ -56,6 +56,8 @@ from fastapi.requests import Request
 from fastapi.responses import Response, JSONResponse
 from app.core.metrics import metrics_collector
 
+DOC_ENDPOINTS = {"/docs", "/redoc", "/openapi.json"}
+
 @app.middleware("http")
 async def add_security_headers_and_observability(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
@@ -79,7 +81,18 @@ async def add_security_headers_and_observability(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    
+    # Route-scoped CSP: Allow jsDelivr CDN & inline scripts exclusively for OpenAPI Swagger/ReDoc pages
+    if request.url.path in DOC_ENDPOINTS:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://cdn.jsdelivr.net https://fastapi.tiangolo.com;"
+        )
+    else:
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        
     return response
 
 # Register routers
@@ -157,22 +170,33 @@ async def check_databases():
     """
     Endpoint to verify connections to Supabase and Qdrant.
     """
+    from app.db.clients import get_supabase_client, get_qdrant_client
+    
+    supabase_status = "local_fallback"
     try:
-        from app.db.clients import supabase_db, qdrant_db
-        collections_count = 0
-        if qdrant_db and hasattr(qdrant_db, "get_collections"):
-            collections = qdrant_db.get_collections()
-            collections_count = len(collections.collections)
-            
-        return {
-            "status": "healthy", 
-            "supabase": "connected" if supabase_db else "local_fallback", 
-            "qdrant": "connected" if qdrant_db else "local_fallback",
-            "qdrant_collections": collections_count
-        }
+        sp_client = get_supabase_client()
+        if sp_client:
+            supabase_status = "connected"
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Database connection degraded.")
+        logger.warning(f"Supabase health probe check: {e}")
+
+    qdrant_status = "local_fallback"
+    collections_count = 0
+    try:
+        qd_client = get_qdrant_client()
+        if qd_client and hasattr(qd_client, "get_collections"):
+            collections = qd_client.get_collections()
+            collections_count = len(collections.collections)
+            qdrant_status = "connected"
+    except Exception as e:
+        logger.warning(f"Qdrant health probe check: {e}")
+
+    return {
+        "status": "healthy", 
+        "supabase": supabase_status, 
+        "qdrant": qdrant_status,
+        "qdrant_collections": collections_count
+    }
 
 if __name__ == "__main__":
     import uvicorn

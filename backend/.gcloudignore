@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Python virtual environments
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Environment files
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test reports
+htmlcov/
+.coverage
+
+# Local scratch/output
+scratch/
+temp/
+tmp/
+
+# Build artifacts
+build/
+dist/
+
+# Documentation (optional)
+docs/
+
+# Docker
+
+docker-compose.yml
+docker-compose.yaml
+
+
+tests/
+scripts/
+openapi.json

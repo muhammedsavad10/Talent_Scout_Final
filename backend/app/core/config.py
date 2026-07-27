@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     DEVELOPMENT_MODE: bool = False
 
     # Security & CORS Settings
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,https://*.vercel.app"
 
     @property
     def cors_origins(self) -> list[str]:

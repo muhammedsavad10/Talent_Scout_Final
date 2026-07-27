@@ -34,13 +34,11 @@ def test_get_supabase_client_success(mocker):
 
 def test_get_supabase_client_failure(mocker):
     """
-    Test that Supabase client creation raises an exception upon failure.
+    Test that Supabase client creation returns None gracefully upon failure (Phase D Memory Fallback).
     """
     mocker.patch("app.db.clients.create_client", side_effect=Exception("Supabase connection error"))
-    
-    with pytest.raises(Exception) as exc_info:
-        get_supabase_client()
-    assert "Supabase connection error" in str(exc_info.value)
+    client = get_supabase_client()
+    assert client is None
 
 def test_get_qdrant_client_success(mocker):
     """
@@ -56,10 +54,8 @@ def test_get_qdrant_client_success(mocker):
 
 def test_get_qdrant_client_failure(mocker):
     """
-    Test that Qdrant client creation raises an exception upon failure.
+    Test that Qdrant client creation returns None gracefully upon failure (Phase D Memory Fallback).
     """
     mocker.patch("app.db.clients.QdrantClient", side_effect=Exception("Qdrant database error"))
-    
-    with pytest.raises(Exception) as exc_info:
-        get_qdrant_client()
-    assert "Qdrant database error" in str(exc_info.value)
+    client = get_qdrant_client()
+    assert client is None

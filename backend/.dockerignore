@@ -1,14 +1,40 @@
-__pycache__
+# Byte-compiled / optimized / DLL files
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache
+
+# Testing & Coverage outputs
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+.cache/
+
+# Version control & CI/CD configs
 .git
 .gitignore
-venv
-env
-ENV
+.github/
+
+# IDE & Editor configuration folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables & secrets
 .env
-.env.local
+.env.*
+env/
+venv/
+ENV/
+
+# Log files & scratch debugging scripts
 *.log
-scratch
+scratch/
+evaluation/reports/
+
+# Frontend build artifacts & node modules (if present in build context)
+node_modules/
+dist/
+build/

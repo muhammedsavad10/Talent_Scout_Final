@@ -6,13 +6,21 @@ type PollBatchResponse = paths['/api/v1/evaluate/batch/{batch_id}']['get']['resp
 
 export const batchService = {
   submitBatch: async (formData: FormData): Promise<SubmitBatchResponse> => {
-    const res = await apiClient.post<SubmitBatchResponse>('/evaluate/batch', formData, {
+  const res = await apiClient.post<SubmitBatchResponse>(
+    '/evaluate/batch',
+    formData,
+    {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
-    return res.data;
-  },
+    }
+  );
+
+  console.log("POST RESPONSE:", res);
+  console.log("POST DATA:", res.data);
+
+  return res.data;
+},
 
   getBatchStatus: async (batchId: string): Promise<PollBatchResponse> => {
     const res = await apiClient.get<PollBatchResponse>(`/evaluate/batch/${batchId}`);

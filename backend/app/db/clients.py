@@ -23,6 +23,9 @@ def get_supabase_client(retries: int = 2, delay: float = 0.5, raise_on_error: bo
         if raise_on_error:
             raise ValueError("SUPABASE_URL or SUPABASE_KEY missing in settings.")
         return None
+
+    url = str(url).strip()
+    key = str(key).strip()
         
     last_exc = None
     for attempt in range(1, retries + 1):
@@ -53,6 +56,9 @@ def get_qdrant_client(retries: int = 2, delay: float = 0.5, raise_on_error: bool
         if raise_on_error:
             raise ValueError("QDRANT_URL or QDRANT_API_KEY missing in settings.")
         return None
+
+    url = str(url).strip()
+    key = str(key).strip()
         
     last_exc = None
     for attempt in range(1, retries + 1):

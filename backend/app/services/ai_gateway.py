@@ -189,12 +189,14 @@ class AIGateway:
         api_key = getattr(settings, "GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
         if not api_key:
             raise RuntimeError("GROQ_API_KEY is missing")
+        api_key = str(api_key).strip()
 
         # Groq API requirement: messages must contain the word 'json' when response_format is json_object
         msg_list = [dict(m) for m in messages]
         if response_format and response_format.get("type") == "json_object":
-            if not any("json" in m.get("content", "").lower() for m in msg_list) and msg_list:
-                msg_list[0]["content"] += " Respond in valid JSON."
+            has_json = any("json" in m.get("content", "").lower() for m in msg_list)
+            if not has_json and msg_list:
+                msg_list[-1]["content"] = msg_list[-1]["content"] + "\n\nReturn response strictly as JSON."
 
         client = Groq(api_key=api_key)
         kwargs = {
@@ -220,6 +222,8 @@ class AIGateway:
     ) -> str:
         from app.core.config import settings
         api_key = getattr(settings, "GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY", "")))
+        if api_key:
+            api_key = str(api_key).strip()
         
         prompt_parts = []
         for m in messages:
