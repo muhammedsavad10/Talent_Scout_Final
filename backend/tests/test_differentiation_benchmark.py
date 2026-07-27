@@ -41,7 +41,7 @@ def test_stage2_differentiation_5_candidate_benchmark():
                     "description": "Built cloud backend systems."
                 }
             ],
-            "certifications": [{"title": "AWS Certified Solutions Architect"}]
+            "certifications": [{"title": "AWS Certified Solutions Architect"}, {"title": "CKA Certified Kubernetes Administrator"}]
         }
     }
 
@@ -120,8 +120,8 @@ def test_stage2_differentiation_5_candidate_benchmark():
     evals_batch = [eval_a, eval_b, eval_c, eval_d, eval_e]
     ranked = compare_candidates(evals_batch)
 
-    # Rank 1 must be Candidate B (Dethan) because of superior professional evidence
-    assert ranked[0]["candidate_name"] == "Dethan"
+    # Under v1.8.5 Hierarchical Technical Dominance, Candidate A ranks #1 (Stage1 Technical Match 94.0% vs 83.0%)
+    assert ranked[0]["candidate_name"] == "Muhammad"
     assert ranked[0]["rank"] == 1
 
     # Candidate E must be bottom ranked

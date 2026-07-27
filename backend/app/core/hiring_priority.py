@@ -959,8 +959,35 @@ def compute_hiring_priority_score(
     assert factors["certifications_pts"] > 0 if len(evidence.certifications) > 0 else True, "Certifications points must be > 0 when certifications are present"
     assert factors["production_engineering_pts"] > 0 if len(evidence.production_engineering) > 0 else True, "Production engineering points must be > 0 when production indicators are present"
 
+    # v1.9.0 Recruiter Intelligence Integration
+    from app.core.evidence_quality import evaluate_evidence_quality
+    from app.core.project_intelligence import analyze_project_intelligence
+    from app.core.employment_intelligence import analyze_employment_intelligence
+    from app.core.recruiter_reasoning import generate_recruiter_reasoning
+    from app.core.score_calibration import calibrate_recruiter_score
+
+    ev_quality = evaluate_evidence_quality(raw_resume_text)
+    proj_intel_list = [analyze_project_intelligence(p).to_dict() for p in personal_projects] if personal_projects else []
+    emp_intel = analyze_employment_intelligence(prof_exp).to_dict()
+    rec_reasoning = generate_recruiter_reasoning(
+        candidate_name=candidate_name,
+        stage1_score=stage1_match_score,
+        hiring_priority_tier=tier,
+        work_history=prof_exp,
+        projects=personal_projects,
+        skills=candidate_skills,
+        missing_skills=[]
+    ).to_dict()
+
+    calibrated_score = calibrate_recruiter_score(
+        raw_score=stage1_match_score,
+        quality_multiplier=ev_quality.quality_multiplier,
+        has_measurable_impact=bool(ev_quality.measurable_metrics)
+    )
+
     return {
         "hiring_priority_score": hiring_priority_score,
+        "calibrated_recruiter_score": calibrated_score,
         "hiring_priority_tier": tier,
         "hiring_risk": risk,
         "stage1_match_score": stage1_match_score,
@@ -968,6 +995,10 @@ def compute_hiring_priority_score(
         "priority_reasons": reasons,
         "fine_grained_evidence": fine_grained_evidence,
         "professional_profile": professional_profile,
+        "evidence_quality": ev_quality.to_dict(),
+        "project_intelligence": proj_intel_list,
+        "employment_intelligence": emp_intel,
+        "recruiter_reasoning": rec_reasoning,
         "employment_history": employment_history,
         "career_progression": career_progression_track,
         "certifications": certs,

@@ -391,8 +391,21 @@ def deduplicate_projects(raw_projects: List[Dict[str, Any]]) -> List[Dict[str, A
     # Step 2 & 3: Multi-Signal Safe Merge Policy
     graph.merge_duplicate_nodes()
 
-    # Step 4 & 5: Runtime JSON Generation & Duplicate Detector Pass
-    final_nodes = [node for node in graph.nodes if node.canonical_title != "Project" or node.description]
+    # Step 4 & 5: Runtime JSON Generation & Prompt Noise Filter
+    PROMPT_METADATA_NOISE = [
+        "required json structure", "json structure", "required json", "return json",
+        "json format", "example json", "schema:"
+    ]
+
+    named_count = sum(1 for n in graph.nodes if n.canonical_title not in ["Project", "Unknown Project", "Unknown"])
+    final_nodes = []
+    for node in graph.nodes:
+        if named_count > 0 and node.canonical_title in ["Project", "Unknown Project", "Unknown"]:
+            continue
+        title_lower = node.canonical_title.lower()
+        if any(noise in title_lower for noise in PROMPT_METADATA_NOISE):
+            continue
+        final_nodes.append(node)
 
     result_projects = [node.to_dict() for node in final_nodes]
 

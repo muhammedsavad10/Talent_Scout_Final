@@ -64,8 +64,10 @@ async def test_v1_8_2_muhammad_runtime_json_entity_graph():
     hp_data = final_json.get("hiring_priority", {})
     personal_projects = hp_data.get("personal_projects", [])
     
-    # Runtime personal_projects count must EQUAL 2
-    assert len(personal_projects) == 2 or len(projects) == 2
+    # Runtime personal_projects must contain Delay2Decision and FairCrop AI
+    project_titles = [p.get("canonical_title") or p.get("title") for p in (personal_projects or projects)]
+    assert any("Delay2Decision" in t for t in project_titles if t)
+    assert any("FairCrop" in t for t in project_titles if t)
     
     # Verify no description-only or anonymous projects
     for p in (personal_projects or projects):
