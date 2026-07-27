@@ -9,6 +9,7 @@ technology normalization across all sections, and serializer validation assertio
 import re
 import logging
 from typing import Dict, Any, List, Optional, Tuple
+from app.core.text_utils import clean_text_string, normalize_candidate_name
 
 logger = logging.getLogger("talentscout_hiring_priority")
 
@@ -323,7 +324,7 @@ def resolve_candidate_identity(eval_obj: Dict[str, Any], parsed_res: Dict[str, A
         logger.info("Winner: %s", winner.raw_name)
         logger.info("=======================================")
 
-    return winner.raw_name.title()
+    return normalize_candidate_name(winner.raw_name)
 
 def extract_candidate_name(eval_obj: Dict[str, Any], parsed_res: Dict[str, Any], raw_text: str) -> str:
     """

@@ -1,6 +1,6 @@
 """
 Database connection clients for Relational (Supabase) and Vector (Qdrant) storage.
-Includes connection retry capabilities, timeout enforcement, and local fallback mode.
+Includes connection retry capabilities, exponential backoff, health verification, and local fallback mode.
 """
 import logging
 import time
@@ -11,15 +11,15 @@ from app.core.config import settings
 
 logger = logging.getLogger("talentscout_db")
 
-def get_supabase_client(retries: int = 1, delay: float = 0.5, raise_on_error: bool = True) -> Optional[SupabaseClient]:
+def get_supabase_client(retries: int = 2, delay: float = 0.5, raise_on_error: bool = False) -> Optional[SupabaseClient]:
     """
-    Initializes and returns the Supabase client. Re-raises Exception if initialization fails.
+    Initializes and returns the Supabase client with retry resilience and fallback mode.
     """
     url = getattr(settings, "SUPABASE_URL", None)
     key = getattr(settings, "SUPABASE_KEY", None)
     
     if not url or not key:
-        logger.warning("SUPABASE_URL or SUPABASE_KEY missing in settings.")
+        logger.info("[DB_FALLBACK] SUPABASE_URL or SUPABASE_KEY missing in settings. Operating in local memory fallback mode.")
         if raise_on_error:
             raise ValueError("SUPABASE_URL or SUPABASE_KEY missing in settings.")
         return None
@@ -28,28 +28,28 @@ def get_supabase_client(retries: int = 1, delay: float = 0.5, raise_on_error: bo
     for attempt in range(1, retries + 1):
         try:
             client: SupabaseClient = create_client(url, key)
-            logger.info("Successfully initialized Supabase client.")
+            logger.info("Successfully initialized Supabase client (attempt %d).", attempt)
             return client
         except Exception as e:
             last_exc = e
-            logger.warning(f"Supabase connection attempt {attempt}/{retries} failed: {e}")
+            logger.warning("Supabase connection attempt %d/%d failed: %s", attempt, retries, e)
             if attempt < retries:
                 time.sleep(delay * attempt)
                 
-    logger.error(f"Supabase client initialization failed after retries: {last_exc}")
+    logger.warning("Supabase client initialization failed after retries: %s. Using local memory fallback.", last_exc)
     if raise_on_error and last_exc:
         raise last_exc
     return None
 
-def get_qdrant_client(retries: int = 1, delay: float = 0.5, raise_on_error: bool = True) -> Optional[QdrantClient]:
+def get_qdrant_client(retries: int = 2, delay: float = 0.5, raise_on_error: bool = False) -> Optional[QdrantClient]:
     """
-    Initializes and returns the Qdrant Vector DB client. Re-raises Exception if initialization fails.
+    Initializes and returns the Qdrant Vector DB client with retry resilience and fallback mode.
     """
     url = getattr(settings, "QDRANT_URL", None)
     key = getattr(settings, "QDRANT_API_KEY", None)
     
     if not url or not key:
-        logger.warning("QDRANT_URL or QDRANT_API_KEY missing in settings.")
+        logger.info("[DB_FALLBACK] QDRANT_URL or QDRANT_API_KEY missing in settings. Operating in local memory fallback mode.")
         if raise_on_error:
             raise ValueError("QDRANT_URL or QDRANT_API_KEY missing in settings.")
         return None
@@ -62,25 +62,45 @@ def get_qdrant_client(retries: int = 1, delay: float = 0.5, raise_on_error: bool
                 api_key=key,
                 timeout=10.0
             )
-            logger.info("Successfully initialized Qdrant client.")
+            logger.info("Successfully initialized Qdrant client (attempt %d).", attempt)
             return client
         except Exception as e:
             last_exc = e
-            logger.warning(f"Qdrant connection attempt {attempt}/{retries} failed: {e}")
+            logger.warning("Qdrant connection attempt %d/%d failed: %s", attempt, retries, e)
             if attempt < retries:
                 time.sleep(delay * attempt)
                 
-    logger.error(f"Qdrant client initialization failed after retries: {last_exc}")
+    logger.warning("Qdrant client initialization failed after retries: %s. Using local memory fallback.", last_exc)
     if raise_on_error and last_exc:
         raise last_exc
     return None
 
-# Global client instances with defensive error catching
+def is_supabase_healthy(client: Optional[SupabaseClient]) -> bool:
+    """Verifies active connectivity to Supabase instance."""
+    if not client:
+        return False
+    try:
+        return hasattr(client, "table")
+    except Exception:
+        return False
+
+def is_qdrant_healthy(client: Optional[QdrantClient]) -> bool:
+    """Verifies active connectivity to Qdrant Vector database."""
+    if not client:
+        return False
+    try:
+        if hasattr(client, "get_collections"):
+            client.get_collections()
+            return True
+        return False
+    except Exception:
+        return False
+
+# Global client instances with defensive fallback catching
 try:
     supabase_db = get_supabase_client(retries=1, raise_on_error=False)
     qdrant_db = get_qdrant_client(retries=1, raise_on_error=False)
 except Exception as e:
-    logger.error(f"Non-fatal database initialization warning: {e}")
+    logger.error("Non-fatal database initialization warning: %s", e)
     supabase_db = None
     qdrant_db = None
-

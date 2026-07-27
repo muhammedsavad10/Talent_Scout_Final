@@ -1,7 +1,8 @@
 """
 Prometheus Metrics & Observability Collector for TalentScout Enterprise.
 Provides thread-safe Prometheus plaintext metrics rendering for HTTP requests, latency histograms,
-evaluation throughput, cache hit ratios, and API error counts without external C-dependencies.
+evaluation throughput, cache hit ratios, stage-by-stage execution timings, and API error counts.
+Tailored for Google Cloud Run container observability and Vercel cross-origin request tracing.
 """
 import time
 import threading
@@ -16,6 +17,8 @@ class MetricsCollector:
         self._evaluations_total: Dict[str, int] = {}
         self._cache_hits_total: Dict[str, int] = {}
         self._errors_total: Dict[Tuple[str, int], int] = {}
+        self._stage_duration_sum: Dict[str, float] = {}
+        self._stage_duration_count: Dict[str, int] = {}
         self._start_time = time.time()
 
     def record_request(self, method: str, endpoint: str, status_code: int, duration: float):
@@ -35,6 +38,12 @@ class MetricsCollector:
     def record_cache_hit(self, stage: str = "parsing"):
         with self._lock:
             self._cache_hits_total[stage] = self._cache_hits_total.get(stage, 0) + 1
+
+    def record_stage_duration(self, stage: str, duration_ms: float):
+        """Records stage-by-stage pipeline execution timing breakdown in milliseconds."""
+        with self._lock:
+            self._stage_duration_sum[stage] = self._stage_duration_sum.get(stage, 0.0) + (duration_ms / 1000.0)
+            self._stage_duration_count[stage] = self._stage_duration_count.get(stage, 0) + 1
 
     def generate_prometheus_text(self) -> str:
         with self._lock:
@@ -65,6 +74,17 @@ class MetricsCollector:
 
             for tier, count in self._evaluations_total.items():
                 lines.append(f'talentscout_evaluations_total{{tier="{tier}"}} {count}')
+
+            lines.extend([
+                "",
+                "# HELP talentscout_stage_duration_seconds_sum Pipeline stage duration sum in seconds.",
+                "# TYPE talentscout_stage_duration_seconds_sum counter",
+            ])
+
+            for stage, sum_val in self._stage_duration_sum.items():
+                count_val = self._stage_duration_count.get(stage, 0)
+                lines.append(f'talentscout_stage_duration_seconds_sum{{stage="{stage}"}} {sum_val:.4f}')
+                lines.append(f'talentscout_stage_duration_seconds_count{{stage="{stage}"}} {count_val}')
 
             lines.extend([
                 "",
