@@ -40,12 +40,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS with explicit allowlist (Phase C Security Hardening)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://talent-scout-final-mocha.vercel.app",
+    ],
+    allow_origin_regex=r"https://talent-scout-final-.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
