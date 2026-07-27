@@ -21,17 +21,37 @@ export function useUpload() {
       formData.append('job_description', payload.jobDescription);
       formData.append('jd_skills', payload.jdSkills.join(', '));
       
-      return batchService.submitBatch(formData);
+      const result = await batchService.submitBatch(formData);
+
+      console.log("========== UPLOAD RESPONSE ==========");
+      console.log(result);
+      console.log("Batch ID:", result?.batch_id);
+      console.log("Status:", result?.status);
+      console.log("====================================");
+
+      return result;
     },
     onSuccess: (data) => {
-      const result = data as { batch_id: string };
-      logger.info('Batch successfully submitted and queued. Batch ID:', result.batch_id);
-      setLastBatchId(result.batch_id);
-      navigate(ROUTES.BATCH.replace(':id', result.batch_id));
-    },
+    console.log("===== onSuccess =====");
+    console.log(data);
+
+    const result = data as { batch_id: string };
+
+    console.log("Batch ID:", result.batch_id);
+
+    setLastBatchId(result.batch_id);
+
+   console.log("Navigating to:",
+    ROUTES.BATCH.replace(':id', result.batch_id)
+  );
+
+  navigate(ROUTES.BATCH.replace(':id', result.batch_id));
+
+  console.log("Navigation called");
+},
     onError: (err) => {
-      logger.error('Failed to submit resume batch:', err);
-    },
+  console.error("UPLOAD ERROR:", err);
+},
   });
 }
 export default useUpload;
