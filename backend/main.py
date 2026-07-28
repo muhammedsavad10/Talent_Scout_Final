@@ -174,6 +174,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 async def check_databases():
     """
     Endpoint to verify connections to Supabase and Qdrant.
+    Raises 503 Service Unavailable if database connections fail.
     """
     from app.db.clients import get_supabase_client, get_qdrant_client
     
@@ -183,7 +184,8 @@ async def check_databases():
         if sp_client:
             supabase_status = "connected"
     except Exception as e:
-        logger.warning(f"Supabase health probe check: {e}")
+        logger.warning(f"Supabase health probe check failed: {e}")
+        raise HTTPException(status_code=503, detail="Database connection degraded.")
 
     qdrant_status = "local_fallback"
     collections_count = 0
@@ -194,7 +196,8 @@ async def check_databases():
             collections_count = len(collections.collections)
             qdrant_status = "connected"
     except Exception as e:
-        logger.warning(f"Qdrant health probe check: {e}")
+        logger.warning(f"Qdrant health probe check failed: {e}")
+        raise HTTPException(status_code=503, detail="Database connection degraded.")
 
     return {
         "status": "healthy", 

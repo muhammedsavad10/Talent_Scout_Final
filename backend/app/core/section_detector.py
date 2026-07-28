@@ -46,11 +46,14 @@ def detect_resume_sections(text: str) -> Dict[str, str]:
         line_clean = line.strip()
         if not line_clean:
             continue
+
+        # Strip non-ASCII or emoji symbols at start of line for robust section header matching
+        clean_header_line = re.sub(r'^[^\w\s]+', '', line_clean).strip()
             
         detected = None
         for sec_name, patterns in SECTION_HEADINGS.items():
             for pat in patterns:
-                if re.match(pat, line_clean):
+                if re.match(pat, line_clean) or (clean_header_line and re.match(pat, clean_header_line)):
                     detected = sec_name
                     break
             if detected:

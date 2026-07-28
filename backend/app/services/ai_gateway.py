@@ -50,18 +50,32 @@ def _extract_deterministic_fallback_resume(prompt_text: str) -> str:
     from app.agents.evidence_classifier import classify_experience_type, ExperienceCategory, KNOWN_PROJECT_TITLES
     
     if exp_text:
+        # Pre-process multi-column Canva/two-column resumes by extracting the primary left column
+        clean_exp_lines = []
+        for line in exp_text.splitlines():
+            cols = [c.strip() for c in re.split(r'\s{2,}', line) if c.strip()]
+            if cols:
+                clean_exp_lines.append(cols[0])
+        clean_exp_text = "\n".join(clean_exp_lines) if clean_exp_lines else exp_text
+
         work_patterns = [
             r'(?i)(?P<role>[A-Za-z0-9\s]{3,35}?)\s+(?:at|@|–|-)\s+(?P<company>[A-Za-z0-9\s&,.]+?)(?:\s*\((?P<dates>[0-9\s\-Present]+)\)|\s*(?=\n|\.|$))',
-            r'(?i)(?P<company>[A-Za-z0-9\s&,.]+?)\s*[\-–|]\s*(?P<role>[A-Za-z0-9\s]{3,35}?)(?:\s*\((?P<dates>[0-9\s\-Present]+)\)|\s*(?=\n|\.|$))'
+            r'(?i)(?P<company>[A-Za-z0-9\s&,.]+?)\s*[\-–|]\s*(?P<role>[A-Za-z0-9\s]{3,35}?)(?:\s*\((?P<dates>[0-9\s\-Present]+)\)|\s*(?=\n|\.|$))',
+            r'(?i)(?P<role>[A-Za-z0-9\s]{3,35})\n(?P<company>[A-Za-z0-9\s&,.]{2,35})\s*\((?P<dates>[0-9\s\-Present]+)\)'
         ]
         
+        action_verbs_set = {"built", "developed", "created", "designed", "architected", "implemented", "engineered", "wrote", "spearheaded", "led", "managed"}
         seen_combos = set()
         for pattern in work_patterns:
-            for match in re.finditer(pattern, exp_text):
+            for match in re.finditer(pattern, clean_exp_text):
                 role_str = match.group("role").strip()
                 comp_str = match.group("company").strip()
                 dates_str = match.group("dates").strip() if match.groupdict().get("dates") else ""
                 
+                first_comp_word = comp_str.lower().split()[0] if comp_str.split() else ""
+                if first_comp_word in action_verbs_set or "built rest api" in comp_str.lower():
+                    continue
+
                 # Filter out non-company headers or broad section titles
                 if len(role_str) > 3 and len(comp_str) > 2 and comp_str.lower() not in ["resume", "experience", "education", "skills", "projects", "certifications"]:
                     exp_cat = classify_experience_type(comp_str, role_str, source_section="experience")

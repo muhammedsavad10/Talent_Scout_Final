@@ -45,11 +45,11 @@ def test_health_databases_disaster_qdrant_failure(mocker):
     Test /health/databases disaster path: Qdrant client throws exception.
     Ensures gateway returns 503 Service Unavailable instead of crashing.
     """
-    mocker.patch("app.db.clients.supabase_db")
-    mock_qdrant = mocker.patch("app.db.clients.qdrant_db")
-    
-    # Force get_collections to throw an exception
-    mock_qdrant.get_collections.side_effect = Exception("Vector DB Server down")
+    mocker.patch("app.db.clients.get_supabase_client")
+    mock_get_qd = mocker.patch("app.db.clients.get_qdrant_client")
+    mock_qd_instance = mocker.MagicMock()
+    mock_qd_instance.get_collections.side_effect = Exception("Vector DB Server down")
+    mock_get_qd.return_value = mock_qd_instance
     
     response = client.get("/health/databases")
     assert response.status_code == 503
@@ -60,9 +60,7 @@ def test_health_databases_disaster_import_failure(mocker):
     Test /health/databases disaster path: Database client fails to import/is not initialized.
     Ensures gateway returns 503 Service Unavailable instead of crashing.
     """
-    mock_module = mocker.MagicMock()
-    type(mock_module).supabase_db = mocker.PropertyMock(side_effect=Exception("Supabase connection timeout"))
-    mocker.patch.dict("sys.modules", {"app.db.clients": mock_module})
+    mocker.patch("app.db.clients.get_supabase_client", side_effect=Exception("Supabase connection timeout"))
     
     response = client.get("/health/databases")
     assert response.status_code == 503
