@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, "feature/*" ]
     paths:
-      - 'talent_scout_enterprise/frontend/**'
+      - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'talent_scout_enterprise/frontend/**'
+      - 'frontend/**'
 
 # Security: Enforce principle of least privilege
 permissions:
@@ -23,17 +23,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'talent_scout_enterprise/frontend/package.json'
+          cache-dependency-path: 'frontend/package.json'
 
       - name: Install Frontend Dependencies
-        working-directory: talent_scout_enterprise/frontend
+        working-directory: frontend
         run: npm install --legacy-peer-deps
 
       - name: Compile TypeScript & Build Production Asset Bundle
-        working-directory: talent_scout_enterprise/frontend
+        working-directory: frontend
         run: npm run build
