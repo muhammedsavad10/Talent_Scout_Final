@@ -1,113 +1,68 @@
-import { AxiosError } from 'axios';
-import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { apiClient } from './apiClient';
-import { ERROR_MESSAGES } from '../constants/errors';
-import { sentry } from '@/shared/utils';
+import type { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-export class AppError extends Error {
-  public readonly title: string;
-  public readonly statusCode: number | null;
-  public readonly retryable: boolean;
-
-  constructor(title: string, message: string, statusCode: number | null = null, retryable = false) {
-    super(message);
-    this.name = 'AppError';
-    this.title = title;
-    this.statusCode = statusCode;
-    this.retryable = retryable;
-    Object.setPrototypeOf(this, AppError.prototype);
-  }
+export interface AppError {
+  message: string;
+  statusCode?: number | undefined;
+  code?: string | undefined;
+  raw?: unknown;
 }
 
-const extractErrorMessage = (data: any): string => {
-  if (!data) return ERROR_MESSAGES.GENERIC_ERROR;
-  if (typeof data === 'string') return data;
+export const mapAxiosErrorToAppError = (error: AxiosError): AppError => {
+  const statusCode = error.response?.status;
+  const data = error.response?.data as { detail?: string; message?: string } | undefined;
   
-  // 1. If detail exists
-  if (data.detail !== undefined && data.detail !== null) {
-    if (typeof data.detail === 'string') return data.detail;
-    if (Array.isArray(data.detail)) {
-      const first = data.detail[0];
-      if (first && typeof first === 'object') {
-        return (first as any).msg || JSON.stringify(first);
-      }
-      return JSON.stringify(data.detail);
-    }
-    if (typeof data.detail === 'object') {
-      return (data.detail as any).description || (data.detail as any).message || JSON.stringify(data.detail);
-    }
-  }
-
-  // 2. If description exists
-  if (typeof data.description === 'string') return data.description;
+  let message = 'An unexpected error occurred. Please try again.';
   
-  // 3. If message exists
-  if (typeof data.message === 'string') return data.message;
-  if (typeof data.message === 'object' && data.message !== null) {
-    return (data.message as any).description || (data.message as any).message || JSON.stringify(data.message);
+  if (data?.detail) {
+    message = data.detail;
+  } else if (data?.message) {
+    message = data.message;
+  } else if (error.message) {
+    message = error.message;
   }
 
-  // 4. If error object exists
-  if (typeof data.error === 'string') return data.error;
-  if (typeof data.error === 'object' && data.error !== null) {
-    return (data.error as any).description || (data.error as any).message || JSON.stringify(data.error);
-  }
-
-  // 5. Direct properties check
-  if (typeof data.description === 'object' && data.description !== null) {
-    return JSON.stringify(data.description);
-  }
-
-  const rawDesc = data.description || data.message || data.error;
-  if (typeof rawDesc === 'string') return rawDesc;
-
-  return JSON.stringify(data);
+  return {
+    message,
+    statusCode,
+    code: error.code,
+    raw: error,
+  };
 };
 
-const mapAxiosErrorToAppError = (error: AxiosError): AppError => {
-  const status = error.response?.status ?? null;
-  const errorData = error.response?.data;
-  
-  let title = 'Connection Failure';
-  let message: string = ERROR_MESSAGES.GENERIC_ERROR;
-  let retryable = false;
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (error: any) => void }> = [];
 
-  if (status === 400) {
-    title = 'Bad Request';
-    message = extractErrorMessage(errorData);
-  } else if (status === 413) {
-    title = 'Payload Too Large';
-    message = ERROR_MESSAGES.FILE_TOO_LARGE;
-  } else if (status === 415) {
-    title = 'Unsupported Type';
-    message = extractErrorMessage(errorData);
-  } else if (status === 422) {
-    title = 'Validation Schema Error';
-    message = extractErrorMessage(errorData);
-  } else if (status === 429) {
-    title = 'Rate Limit Exceeded';
-    message = ERROR_MESSAGES.RATE_LIMIT_EXCEEDED;
-    retryable = true;
-  } else if (status && status >= 500) {
-    title = 'Server Error';
-    message = extractErrorMessage(errorData) || 'Third-party parser nodes failed. Please re-upload.';
-    retryable = true;
-  }
-
-  const appErr = new AppError(title, message, status, retryable);
-  
-  // Track backend and network gateway crashes through Sentry
-  sentry.captureException(appErr, {
-    axiosMessage: error.message,
-    url: error.config?.url,
-    method: error.config?.method,
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((promise) => {
+    if (error) {
+      promise.reject(error);
+    } else {
+      promise.resolve(token!);
+    }
   });
+  failedQueue = [];
+};
 
-  return appErr;
+const isAuthEndpoint = (url: string = ''): boolean => {
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/token') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  );
 };
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const url = config.url || '';
+    // Do NOT attach Authorization header to authentication endpoints to prevent credential leakage or loops
+    if (!isAuthEndpoint(url)) {
+      const token = localStorage.getItem('talentscout_access_token');
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error: AxiosError) => {
@@ -119,8 +74,56 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response;
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const status = error.response?.status;
+    const url = originalRequest?.url || '';
+
+    // NEVER attempt token refresh for authentication endpoints (/auth/login, /auth/token, /auth/refresh, /auth/logout)
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint(url)) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({
+            resolve: (token: string) => {
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+              }
+              resolve(apiClient(originalRequest));
+            },
+            reject: (err: any) => {
+              reject(err);
+            },
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { useAuthStore } = await import('@/features/auth/store/useAuthStore');
+        const refreshed = await useAuthStore.getState().refreshSession();
+        if (refreshed) {
+          const newToken = localStorage.getItem('talentscout_access_token');
+          if (newToken && originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+          processQueue(null, newToken);
+          return apiClient(originalRequest);
+        } else {
+          processQueue(new Error('Refresh session expired'), null);
+        }
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        const { useAuthStore } = await import('@/features/auth/store/useAuthStore');
+        await useAuthStore.getState().logout();
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     return Promise.reject(mapAxiosErrorToAppError(error));
   }
 );
+
 export default apiClient;

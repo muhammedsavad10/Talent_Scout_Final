@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ROUTES } from '@/shared/constants/routes';
-import { Layout, Upload, Settings, BarChart2, Menu, X, Sun, Moon } from 'lucide-react';
+import { Layout, Upload, Settings, BarChart2, Menu, X, Sun, Moon, LogOut } from 'lucide-react';
 import { useTheme } from '@/app/providers/ThemeProvider';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 
 export const SidebarLayout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const { user, logout } = useAuthStore();
 
   const menuItems = [
     { name: 'Dashboard', path: ROUTES.DASHBOARD, icon: BarChart2 },
@@ -77,7 +79,59 @@ export const SidebarLayout: React.FC = () => {
           })}
         </nav>
         
-        <div style={{ padding: '16px', borderTop: '1px solid hsl(var(--border))', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* User Profile & Logout Section */}
+        {user && (
+          <div style={{ padding: '12px 16px', borderTop: '1px solid hsl(var(--border))', background: 'rgba(15, 23, 42, 0.4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 700
+              }}>
+                {user.full_name ? user.full_name.charAt(0) : 'R'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'hsl(var(--foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.full_name}
+                </p>
+                <p style={{ margin: 0, fontSize: '11px', color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#f87171',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'var(--transition)'
+              }}
+            >
+              <LogOut size={14} />
+              Sign Out
+            </button>
+          </div>
+        )}
+
+        <div style={{ padding: '12px 16px', borderTop: '1px solid hsl(var(--border))', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: 'hsl(var(--muted-foreground))' }}>System v1.0.0</span>
           <button
             onClick={toggleTheme}

@@ -1,6 +1,5 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppError } from '@/shared/api/interceptors';
 
 // Configure the QueryClient with production defaults
 const queryClient = new QueryClient({
@@ -13,8 +12,9 @@ const queryClient = new QueryClient({
         // Only retry transient network/server failures up to 3 times
         if (failureCount >= 3) return false;
         
-        if (error instanceof AppError) {
-          return error.retryable;
+        const statusCode = (error as any)?.statusCode;
+        if (statusCode && statusCode >= 500) {
+          return true;
         }
         return false;
       },

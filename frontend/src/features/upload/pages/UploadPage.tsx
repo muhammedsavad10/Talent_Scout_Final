@@ -6,7 +6,7 @@ import { JobDescriptionInput } from '../components/JobDescriptionInput';
 import { SkillsTagInput } from '../components/SkillsTagInput';
 import { useFileValidation } from '../hooks/useFileValidation';
 import { useUpload } from '../hooks/useUpload';
-import { AppError } from '@/shared/api/interceptors';
+import type { AppError } from '@/shared/api/interceptors';
 
 export const UploadPage: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
@@ -68,11 +68,8 @@ export const UploadPage: React.FC = () => {
       },
       {
         onError: (error) => {
-          if (error instanceof AppError) {
-            setSubmitError(error.message);
-          } else {
-            setSubmitError('Failed to upload files. Internal gateway failure.');
-          }
+          const msg = (error as AppError)?.message || 'Failed to upload files. Internal gateway failure.';
+          setSubmitError(msg);
         },
       }
     );

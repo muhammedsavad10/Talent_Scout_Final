@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { assistantService } from '@/shared/api';
 import { logger } from '@/shared/utils';
-import { AppError } from '@/shared/api/interceptors';
+import type { AppError } from '@/shared/api/interceptors';
 
 export interface AssistantAskResponse {
   answer: string;

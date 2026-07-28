@@ -4,7 +4,7 @@ import { batchService } from '@/shared/api';
 import { ROUTES } from '@/shared/constants/routes';
 import { logger } from '@/shared/utils';
 import type { paths } from '@/generated/api';
-import { AppError } from '@/shared/api/interceptors';
+import type { AppError } from '@/shared/api/interceptors';
 import { useAppStore } from '@/shared/store/useAppStore';
 
 type SubmitBatchResponse = paths['/api/v1/evaluate/batch']['post']['responses']['200']['content']['application/json'];

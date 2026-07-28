@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.api.ingest import router as ingest_router
 from app.api.evaluate import router as evaluate_router
 from app.api.batch_evaluate import router as batch_evaluate_router
+from app.api.auth import router as auth_router
 
 from contextlib import asynccontextmanager
 
@@ -99,6 +100,7 @@ async def add_security_headers_and_observability(request: Request, call_next):
     return response
 
 # Register routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(ingest_router, prefix="/api/v1/ingestion", tags=["Ingestion"])
 app.include_router(evaluate_router, prefix="/api/v1/evaluation", tags=["Evaluation Swarm"])
 app.include_router(batch_evaluate_router, prefix="/api/v1/evaluate", tags=["Batch Evaluation"])
