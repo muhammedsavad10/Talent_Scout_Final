@@ -1,14 +1,39 @@
+# ==============================================================================
+# TalentScout Enterprise FastAPI Backend — Production Requirements
+# Compatible with: Python 3.10, PyTorch CPU, FastAPI, Pydantic v2, Docker & Cloud Run
+# ==============================================================================
+
+# Core Web & API Framework
 fastapi>=0.100.0
 uvicorn[standard]>=0.22.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-multipart>=0.0.6
 httpx>=0.24.0
-groq>=0.4.0
-supabase>=2.0.0
-qdrant-client>=1.6.0
-prometheus-client>=0.17.0
-pypdf==5.0.0
+
+# Security & Authentication
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.0
 pyjwt>=2.8.0
+
+# Database & Vector Infrastructure
+supabase>=2.0.0
+qdrant-client>=1.6.0
+
+# AI, Embeddings & Machine Learning
+groq>=0.4.0
+pypdf>=5.0.0
+sentence-transformers>=2.2.2
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+scikit-learn>=1.2.0
+
+# Observability & Metrics
+prometheus-client>=0.17.0
+
+# Testing & Quality Assurance
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+ruff>=0.1.0
