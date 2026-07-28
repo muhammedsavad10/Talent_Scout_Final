@@ -1,0 +1,45 @@
+[tool.ruff]
+target-version = "py310"
+
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "dist",
+    "build",
+    "scratch",
+]
+
+line-length = 100
+
+[tool.ruff.lint]
+# Practical Production Profile for CI Quality Gate:
+# Enables critical syntax errors (E), Pyflakes bug risks (F), and Bugbear runtime flaws (B)
+select = ["E", "F", "B"]
+
+ignore = [
+    "E402",   # Module level import not at top of file (used for middleware setup & lazy imports)
+    "E501",   # Line too long (handled by Black/formatter)
+    "E741",   # Ambiguous variable name (e.g. single-letter 'l' in list comprehensions)
+    "I001",   # Import block sorting (cosmetic import formatting)
+    "F401",   # Unused imports (common in package __init__.py and type stubs)
+    "F541",   # f-string without placeholders
+    "F601",   # Repeated dictionary key literals
+    "F811",   # Redefinition of unused imports or function names in conditional blocks
+    "F841",   # Local variable assigned but never used
+    "B007",   # Loop control variable not used inside loop body (e.g. 'for k, v in dict.items()')
+    "B008",   # Do not perform function call in argument defaults (required for FastAPI Depends/Query)
+    "B904",   # Exception chaining (raise ... from err)
+    "TRY",    # Try-except opinionated style rules
+    "BLE",    # Blind except catching
+    "LOG",    # Logging statement formatting
+    "ANN",    # Type annotation style rules
+    "D",      # Docstring style requirements
+    "PLR",    # Refactoring complexity rules
+    "C90",    # McCabe complexity limits
+    "ERA",    # Commented-out code detection
+    "N",      # Naming conventions
+    "ARG",    # Unused function arguments
+]
