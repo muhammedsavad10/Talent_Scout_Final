@@ -3,7 +3,7 @@
 # Deployment Target: Google Cloud Run (Containerized Serverless Compute)
 # Base Image: Python 3.10 Slim
 # Security: OWASP Non-Root Execution (appuser:appgroup 999:999)
-# Optimization: Single-Pass CPU-Only PyTorch Installation & Layered Cache
+# Optimization: Single-Pass Production Runtime Installation (No Dev/Test Tools)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependency manifest first to maximize Docker layer caching
 COPY requirements.txt .
 
-# Pre-install dependencies in a single layer using python -m pip with CPU-only PyTorch index
+# Pre-install runtime dependencies in a single layer using python -m pip
 RUN python -m pip install --upgrade pip && \
     python -m pip install --user --no-cache-dir -r requirements.txt
 

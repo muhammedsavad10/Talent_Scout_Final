@@ -1,5 +1,6 @@
 # ==============================================================================
 # TalentScout Enterprise FastAPI Backend — Development & Testing Requirements
+# Inherits all runtime dependencies and adds test runner / linter utilities
 # ==============================================================================
 -r requirements.txt
 
