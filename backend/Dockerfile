@@ -2,8 +2,8 @@
 # Production Multi-Stage Dockerfile for TalentScout Enterprise FastAPI Backend
 # Deployment Target: Google Cloud Run (Containerized Serverless Compute)
 # Base Image: Python 3.10 Slim
-# Verified Entrypoint: main:app (main.py at backend root)
-# Verified Healthcheck: /health/liveness (explicitly registered in main.py)
+# Security: OWASP Non-Root Execution (appuser:appgroup 999:999)
+# Optimization: Single-Pass CPU-Only PyTorch Installation & Layered Cache
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -11,7 +11,6 @@
 # ------------------------------------------------------------------------------
 FROM python:3.10-slim AS builder
 
-# Set working directory inside builder container
 WORKDIR /app
 
 # Configure build-time environment flags
@@ -20,23 +19,23 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PIP_NO_CACHE_DIR=1
 
-# Install runtime utility (curl for healthcheck validation)
+# Install runtime utilities (curl for healthchecks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency manifest first to optimize Docker layer caching
+# Copy dependency manifest first to maximize Docker layer caching
 COPY requirements.txt .
 
-# Pre-install wheel packages into user local directory (/root/.local)
-RUN pip install --user --no-cache-dir -r requirements.txt
+# Pre-install dependencies in a single layer using python -m pip with CPU-only PyTorch index
+RUN python -m pip install --upgrade pip && \
+    python -m pip install --user --no-cache-dir -r requirements.txt
 
 # ------------------------------------------------------------------------------
 # STAGE 2: Production Runner Stage (Minimal Runtime Image)
 # ------------------------------------------------------------------------------
 FROM python:3.10-slim AS runner
 
-# Set working directory for production application
 WORKDIR /app
 
 # Production environment configuration for Google Cloud Run
@@ -73,5 +72,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8080}/health/liveness || exit 1
 
-# Execute Uvicorn server referencing verified main:app entrypoint
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Execute Uvicorn server using exec form to pass OS signals (SIGTERM/SIGINT) cleanly
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

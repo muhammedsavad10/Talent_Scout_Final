@@ -1,7 +1,8 @@
 # ==============================================================================
-# TalentScout Enterprise FastAPI Backend — Production Requirements
-# Compatible with: Python 3.10, PyTorch CPU, FastAPI, Pydantic v2, Docker & Cloud Run
+# TalentScout Enterprise FastAPI Backend — Production Runtime Requirements
+# PyTorch Index: Configured for CPU-Only wheels (Google Cloud Run optimized)
 # ==============================================================================
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 # Core Web & API Framework
 fastapi>=0.100.0
@@ -31,9 +32,3 @@ scikit-learn>=1.2.0
 
 # Observability & Metrics
 prometheus-client>=0.17.0
-
-# Testing & Quality Assurance
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-mock>=3.11.0
-ruff>=0.1.0

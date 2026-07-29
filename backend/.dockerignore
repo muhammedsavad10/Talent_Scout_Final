@@ -10,6 +10,7 @@ __pycache__/
 coverage/
 htmlcov/
 .cache/
+tests/
 
 # Version control & CI/CD configs
 .git
@@ -29,10 +30,11 @@ env/
 venv/
 ENV/
 
-# Log files & scratch debugging scripts
+# Log files, scratch debugging & documentation
 *.log
 scratch/
-evaluation/reports/
+docs/
+evaluation/
 
 # Frontend build artifacts & node modules (if present in build context)
 node_modules/
