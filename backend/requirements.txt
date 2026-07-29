@@ -1,5 +1,5 @@
 # ==============================================================================
-# TalentScout Enterprise FastAPI Backend — Production Runtime Requirements
+# TalentScout Enterprise FastAPI Backend — Production Requirements
 # PyTorch Index: Configured for CPU-Only wheels (Google Cloud Run optimized)
 # ==============================================================================
 --extra-index-url https://download.pytorch.org/whl/cpu
@@ -32,3 +32,9 @@ scikit-learn>=1.2.0
 
 # Observability & Metrics
 prometheus-client>=0.17.0
+
+# Testing & Quality Assurance
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+ruff>=0.1.0
