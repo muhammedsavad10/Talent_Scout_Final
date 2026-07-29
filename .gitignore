@@ -59,3 +59,4 @@ task.md
 walkthrough.md
 rescan_results.json
 .test_files.py
+backend/github-actions-key.json
