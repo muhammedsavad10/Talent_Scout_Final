@@ -30,23 +30,35 @@ def extract_dimension_score(dimensions: Any, dim_key: str) -> float:
 
 def candidate_comparator_key(a: Dict[str, Any], b: Dict[str, Any], margin: float = 3.0) -> int:
     """
-    Two-Phase Candidate Ranking Key Function.
-    Evaluates Stage 2 Recruiter & Experience Intelligence (hiring_priority_score) as primary discriminator,
-    ensuring experienced candidates appropriately outrank freshers with keyword-dense resumes.
+    Two-Phase Lexicographic Candidate Ranking Key Function (v1.8.5).
+    1. Primary Discriminator: Stage 2 Hiring Priority (hiring_priority_score / recruiter_score).
+       Ensures verified experience, seniority, and production engineering outrank freshers with keyword-dense resumes.
+    2. Secondary Discriminator: Stage 1 Technical Match (stage1_match_score / overall_score).
+       Acts as tie-breaker when Stage 2 Hiring Priority scores are equal or within tie threshold.
+    3. Tertiary Discriminator: Evidence Confidence, Project Relevance, Experience Quality.
     Returns -1 if 'a' should precede 'b' (higher rank), 1 if 'b' should precede 'a', 0 if equal.
     """
-    # Primary Sort: Stage 2 Hiring Priority Score (integrates Technical Match + Work Experience + Seniority)
-    s2_a = float(a.get("hiring_priority_score") or a.get("overall_score") or 0.0)
-    s2_b = float(b.get("hiring_priority_score") or b.get("overall_score") or 0.0)
+    # Primary Sort: Stage 2 Hiring Priority Score
+    s2_a = float(a.get("hiring_priority_score") if a.get("hiring_priority_score") is not None else (
+        a.get("hiring_priority", {}).get("hiring_priority_score") if isinstance(a.get("hiring_priority"), dict) else (
+            a.get("recruiter_score") if a.get("recruiter_score") is not None else a.get("overall_score", 0.0)
+        )
+    ))
+    s2_b = float(b.get("hiring_priority_score") if b.get("hiring_priority_score") is not None else (
+        b.get("hiring_priority", {}).get("hiring_priority_score") if isinstance(b.get("hiring_priority"), dict) else (
+            b.get("recruiter_score") if b.get("recruiter_score") is not None else b.get("overall_score", 0.0)
+        )
+    ))
     diff_s2 = s2_a - s2_b
 
     if abs(diff_s2) > 0.001:
         return -1 if s2_a > s2_b else 1
 
     # Secondary Sort: Stage 1 Technical Match Score
-    s1_a = float(a.get("overall_score", 0.0))
-    s1_b = float(b.get("overall_score", 0.0))
+    s1_a = float(a.get("stage1_match_score") if a.get("stage1_match_score") is not None else a.get("overall_score", 0.0))
+    s1_b = float(b.get("stage1_match_score") if b.get("stage1_match_score") is not None else b.get("overall_score", 0.0))
     diff_s1 = s1_a - s1_b
+
     if abs(diff_s1) > 0.001:
         return -1 if s1_a > s1_b else 1
 
@@ -66,7 +78,7 @@ def candidate_comparator_key(a: Dict[str, Any], b: Dict[str, Any], margin: float
 def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) -> List[Dict[str, Any]]:
     """
     v1.8.5 Hierarchical Lexicographic Candidate Ranking Engine.
-    Sorts candidate evaluations using Technical Dominance Gating and Stage 2 Tie-Breaking.
+    Sorts candidate evaluations using Two-Phase Recruiter Priority Ranking.
     """
     valid_candidates = []
     failed_candidates = []
@@ -98,7 +110,6 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
         missing_list = safe_get(recommendation_basis, "critical_missing_skills", [])
 
         stage1_match_score = float(overall_score) if overall_score is not None else 0.0
-        canonical_overall_score = float(hiring_priority_score)
 
         score_breakdown = {
             "stage1_match_score": stage1_match_score,
@@ -125,7 +136,7 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
             "filename": safe_get(eval_obj, "filename", "unknown.pdf"),
             "recommendation_tier": safe_get(rec_section, "hiring_recommendation", "Unknown"),
             "policy_eligible": safe_get(safe_get(eval_obj, "decision_engine", {}), "policy_eligible", False),
-            "overall_score": canonical_overall_score,
+            "overall_score": stage1_match_score,
             "hiring_priority_score": hiring_priority_score,
             "recruiter_score": hiring_priority_score,
             "stage1_match_score": stage1_match_score,
@@ -153,7 +164,7 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
         }
         valid_candidates.append(row)
 
-    # Sort valid candidates using Hierarchical Lexicographic Comparator
+    # Sort valid candidates using Two-Phase Candidate Comparator
     cmp_key = functools.cmp_to_key(lambda a, b: candidate_comparator_key(a, b, margin=technical_margin))
     valid_candidates.sort(key=cmp_key)
 
@@ -161,25 +172,25 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
     ranked = []
     for i, cand in enumerate(valid_candidates):
         cand["rank"] = i + 1
-        s1 = float(cand.get("overall_score", 0.0))
+        s1 = float(cand.get("stage1_match_score", cand.get("overall_score", 0.0)))
         s2 = float(cand.get("hiring_priority_score", 0.0))
 
         if i == 0:
             cand["ranking_explanation"] = (
-                f"Ranked #1 due to dominant Technical Role Match ({s1:.1f}%) and direct Role Fit ({s2:.0f})."
+                f"Ranked #1 due to dominant Stage 2 Hiring Priority ({s2:.0f}) and Technical Role Match ({s1:.1f}%)."
             )
         else:
             prev_cand = valid_candidates[i - 1]
-            prev_s1 = float(prev_cand.get("overall_score", 0.0))
-            if prev_s1 - s1 > technical_margin:
+            prev_s1 = float(prev_cand.get("stage1_match_score", prev_cand.get("overall_score", 0.0)))
+            prev_s2 = float(prev_cand.get("hiring_priority_score", 0.0))
+            if abs(prev_s1 - s1) <= technical_margin or prev_s2 != s2:
                 cand["ranking_explanation"] = (
-                    f"Ranked #{i+1}: Technical role match ({s1:.1f}%) is below Rank #{i} ({prev_s1:.1f}%) "
-                    f"by >{technical_margin:.1f} points (Technical Dominance)."
+                    f"Ranked #{i+1}: Differentiated by Stage 2 Hiring Priority ({s2:.0f})."
                 )
             else:
                 cand["ranking_explanation"] = (
-                    f"Ranked #{i+1}: Comparable technical match ({s1:.1f}% vs {prev_s1:.1f}%), "
-                    f"differentiated by Stage 2 Hiring Priority ({s2:.0f})."
+                    f"Ranked #{i+1}: Technical role match ({s1:.1f}%) is below Rank #{i} ({prev_s1:.1f}%) "
+                    f"by >{technical_margin:.1f} points (Technical Dominance)."
                 )
         ranked.append(cand)
 
