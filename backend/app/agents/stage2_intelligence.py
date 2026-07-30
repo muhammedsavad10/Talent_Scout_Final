@@ -75,9 +75,13 @@ def _generate_recruiter_notes(stage1_eval: Dict[str, Any]) -> str:
     matched = stage1_eval.get("matched_skills", [])
     inferred = stage1_eval.get("inferred_skills", [])
     missing = stage1_eval.get("missing_skills", [])
-    overall = stage1_eval.get("overall_score", 0)
+    stage1_match = int(stage1_eval.get("overall_score", 0))
 
-    parts = [f"{name} evaluated with overall match score {overall}/100."]
+    hp_data = stage1_eval.get("hiring_priority", {})
+    final_score = int(hp_data.get("hiring_priority_score") or stage1_eval.get("overall_score") or 0)
+    tier = str(hp_data.get("hiring_priority_tier", "Standard Review"))
+
+    parts = [f"{name} achieved Stage 1 Technical Match Score of {stage1_match}/100 and Final Recruiter Decision Score of {final_score}/100 ({tier})."]
     if matched:
         parts.append(f"Validated core alignment on {', '.join(matched[:5])}.")
     if inferred:

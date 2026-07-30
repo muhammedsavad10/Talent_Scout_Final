@@ -376,9 +376,10 @@ def _generate_recruiter_notes(parsed_resume: Dict, decision_output: Dict) -> str
     evidence_states = decision_output.get("evidence_states", {})
     matched = evidence_states.get("MATCHED", [])
     missing = evidence_states.get("MISSING", [])
-    overall = decision_output.get("overall_score", 0)
+    stage1_match = int(decision_output.get("stage1_match_score") or decision_output.get("overall_score") or 0)
+    final_score = int(decision_output.get("overall_score") or 0)
 
-    parts = [f"{name} evaluated with overall score {overall}/100."]
+    parts = [f"{name} achieved Stage 1 Technical Match Score of {stage1_match}/100 and Final Recruiter Decision Score of {final_score}/100."]
     if matched:
         parts.append(f"Strong alignment on {', '.join(matched[:5])}.")
     if missing:
