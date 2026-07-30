@@ -120,8 +120,9 @@ def test_stage2_differentiation_5_candidate_benchmark():
     evals_batch = [eval_a, eval_b, eval_c, eval_d, eval_e]
     ranked = compare_candidates(evals_batch)
 
-    # Under v1.8.5 Hierarchical Technical Dominance, Candidate A ranks #1 (Stage1 Technical Match 94.0% vs 83.0%)
-    assert ranked[0]["candidate_name"] == "Muhammad"
+    # Under 2-Phase Recruiter Architecture, Candidate B (Dethan, 7.5 yrs exp) ranks #1
+    assert ranked[0]["candidate_name"] == "Dethan"
+    assert ranked[1]["candidate_name"] == "Muhammad"
     assert ranked[0]["rank"] == 1
 
     # Candidate E must be bottom ranked

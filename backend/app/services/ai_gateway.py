@@ -426,6 +426,11 @@ class AIGateway:
                                         "strengths": ["Strong technical background", "Relevant experience"],
                                         "improvements": ["Deepen domain knowledge in cloud orchestration"]
                                     })
+                                elif stage in ["email_generation", "outreach_generation"]:
+                                    result_str = json.dumps({
+                                        "subject": "Interview Invitation — TalentScout Enterprise",
+                                        "body": "Dear Candidate,\n\nWe are pleased to invite you to an interview based on your evaluated technical experience.\n\nBest regards,\nRecruiter"
+                                    })
                                 else:
                                     result_str = _extract_deterministic_fallback_resume(full_text)
                             else:

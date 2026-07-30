@@ -16,8 +16,10 @@ export const batchService = {
     }
   );
 
-  console.log("POST RESPONSE:", res);
-  console.log("POST DATA:", res.data);
+  if (import.meta.env.DEV) {
+    console.log("POST RESPONSE:", res);
+    console.log("POST DATA:", res.data);
+  }
 
   return res.data;
 },

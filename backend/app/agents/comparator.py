@@ -30,29 +30,27 @@ def extract_dimension_score(dimensions: Any, dim_key: str) -> float:
 
 def candidate_comparator_key(a: Dict[str, Any], b: Dict[str, Any], margin: float = 3.0) -> int:
     """
-    Lexicographic candidate comparison key function.
+    Two-Phase Candidate Ranking Key Function.
+    Evaluates Stage 2 Recruiter & Experience Intelligence (hiring_priority_score) as primary discriminator,
+    ensuring experienced candidates appropriately outrank freshers with keyword-dense resumes.
     Returns -1 if 'a' should precede 'b' (higher rank), 1 if 'b' should precede 'a', 0 if equal.
     """
+    # Primary Sort: Stage 2 Hiring Priority Score (integrates Technical Match + Work Experience + Seniority)
+    s2_a = float(a.get("hiring_priority_score") or a.get("overall_score") or 0.0)
+    s2_b = float(b.get("hiring_priority_score") or b.get("overall_score") or 0.0)
+    diff_s2 = s2_a - s2_b
+
+    if abs(diff_s2) > 0.001:
+        return -1 if s2_a > s2_b else 1
+
+    # Secondary Sort: Stage 1 Technical Match Score
     s1_a = float(a.get("overall_score", 0.0))
     s1_b = float(b.get("overall_score", 0.0))
     diff_s1 = s1_a - s1_b
-
-    # Primary Sort: Technical Dominance Gating (if difference exceeds margin)
-    if diff_s1 > margin:
-        return -1
-    elif diff_s1 < -margin:
-        return 1
-
-    # Secondary Sort: Stage 2 Hiring Priority Score (within technical match margin)
-    s2_a = float(a.get("hiring_priority_score", 0.0))
-    s2_b = float(b.get("hiring_priority_score", 0.0))
-    if s2_a != s2_b:
-        return -1 if s2_a > s2_b else 1
-
-    # Tertiary Sort: Exact Stage 1 Match, Evidence Confidence, Experience Quality
-    if s1_a != s1_b:
+    if abs(diff_s1) > 0.001:
         return -1 if s1_a > s1_b else 1
 
+    # Tertiary Sort: Evidence Confidence & Professional Experience Quality
     conf_a = float(a.get("evidence_confidence", 0.95))
     conf_b = float(b.get("evidence_confidence", 0.95))
     if conf_a != conf_b:
@@ -99,8 +97,11 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
         strengths_list = safe_get(recommendation_basis, "strengths", [])
         missing_list = safe_get(recommendation_basis, "critical_missing_skills", [])
 
+        stage1_match_score = float(overall_score) if overall_score is not None else 0.0
+        canonical_overall_score = float(hiring_priority_score)
+
         score_breakdown = {
-            "stage1_match_score": float(overall_score),
+            "stage1_match_score": stage1_match_score,
             "stage2_priority_score": float(hiring_priority_score),
             "ats_keyword_contribution": "20.0%",
             "semantic_match_contribution": "15.0%",
@@ -113,7 +114,7 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
         }
 
         explanation_narrative = (
-            f"Candidate {cand_name} scored {overall_score:.1f} in Stage 1 Technical Match "
+            f"Candidate {cand_name} scored {stage1_match_score:.1f} in Stage 1 Technical Match "
             f"and {hiring_priority_score} in Stage 2 Hiring Priority ({hiring_priority_tier})."
         )
 
@@ -124,8 +125,11 @@ def compare_candidates(evaluations: List[Any], technical_margin: float = 3.0) ->
             "filename": safe_get(eval_obj, "filename", "unknown.pdf"),
             "recommendation_tier": safe_get(rec_section, "hiring_recommendation", "Unknown"),
             "policy_eligible": safe_get(safe_get(eval_obj, "decision_engine", {}), "policy_eligible", False),
-            "overall_score": float(overall_score),
+            "overall_score": canonical_overall_score,
             "hiring_priority_score": hiring_priority_score,
+            "recruiter_score": hiring_priority_score,
+            "stage1_match_score": stage1_match_score,
+            "technical_score": stage1_match_score,
             "hiring_priority_tier": hiring_priority_tier,
             "hiring_priority": hiring_priority,
             "score_breakdown": score_breakdown,

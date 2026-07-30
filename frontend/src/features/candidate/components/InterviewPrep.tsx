@@ -15,8 +15,35 @@ export const InterviewPrep: React.FC<InterviewPrepProps> = ({
 }) => {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  const [templateType, setTemplateType] = useState('interview_invitation');
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const emailTemplatesList = [
+    { value: 'interview_invitation', label: 'Interview Invitation' },
+    { value: 'technical_assessment', label: 'Technical Assessment' },
+    { value: 'hr_screening', label: 'HR Screening Call' },
+    { value: 'shortlisted_candidate', label: 'Shortlisted Candidate' },
+    { value: 'offer_letter', label: 'Formal Offer Letter' },
+    { value: 'hold_future', label: 'Hold for Future Opportunities' },
+    { value: 'rejection_email', label: 'Rejection Notice' },
+    { value: 'follow_up_reminder', label: 'Follow-up Reminder' }
+  ];
+
+  const handleGenerateEmail = async (selectedTemplate = templateType) => {
+    setLoadingEmail(true);
+    try {
+      logger.info('Requesting recruiter email draft generation for template:', selectedTemplate);
+      const response = await evaluationService.generateEmail(evaluationId, selectedTemplate);
+      const data = response as { subject: string; body: string };
+      setEmailSubject(data.subject);
+      setEmailBody(data.body);
+    } catch (err) {
+      logger.error('Failed to generate email:', err);
+    } finally {
+      setLoadingEmail(false);
+    }
+  };
 
   // Safely normalize raw questions response structure (supports Record<string, string[]>, string[], and undefined)
   const normalizedQuestions = useMemo(() => {
@@ -56,21 +83,6 @@ export const InterviewPrep: React.FC<InterviewPrepProps> = ({
 
     return [];
   }, [questions]);
-
-  const handleGenerateEmail = async () => {
-    setLoadingEmail(true);
-    try {
-      logger.info('Requesting recruiter email draft generation...');
-      const response = await evaluationService.generateEmail(evaluationId);
-      const data = response as { subject: string; body: string };
-      setEmailSubject(data.subject);
-      setEmailBody(data.body);
-    } catch (err) {
-      logger.error('Failed to generate email:', err);
-    } finally {
-      setLoadingEmail(false);
-    }
-  };
 
   const handleCopyEmail = () => {
     const textToCopy = `Subject: ${emailSubject}\n\n${emailBody}`;
@@ -133,19 +145,48 @@ export const InterviewPrep: React.FC<InterviewPrepProps> = ({
           Draft candidate outreach correspondence matching evaluated alignment metrics.
         </Text>
 
-        {!emailBody ? (
-          <Button
-            variant="secondary"
-            onClick={handleGenerateEmail}
-            loading={loadingEmail}
-            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '8px' }}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={templateType}
+            onChange={(e) => {
+              const val = e.target.value;
+              setTemplateType(val);
+              handleGenerateEmail(val);
+            }}
+            style={{
+              padding: '8px 12px',
+              background: 'hsl(var(--secondary))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: 'var(--radius)',
+              color: '#ffffff',
+              fontSize: '13px',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
           >
-            <Mail size={16} /> Generate Outreach Email Draft
-          </Button>
-        ) : (
+            {emailTemplatesList.map((tmpl) => (
+              <option key={tmpl.value} value={tmpl.value}>
+                {tmpl.label}
+              </option>
+            ))}
+          </select>
+
+          {!emailBody && (
+            <Button
+              variant="secondary"
+              onClick={() => handleGenerateEmail(templateType)}
+              loading={loadingEmail}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Mail size={16} /> Generate Outreach Email Draft
+            </Button>
+          )}
+        </div>
+
+        {emailBody && (
           <Card style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid hsl(var(--border))', paddingBottom: '12px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600 }}>Draft: Interview Invitation</span>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>Draft: {emailTemplatesList.find(t => t.value === templateType)?.label || 'Outreach Email'}</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Button variant="ghost" size="sm" onClick={handleCopyEmail} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {copied ? <Check size={14} style={{ color: 'hsl(var(--success))' }} /> : <Copy size={14} />}

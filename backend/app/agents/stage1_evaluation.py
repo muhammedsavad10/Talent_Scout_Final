@@ -138,10 +138,11 @@ def _generate_career_timeline(parsed_resume: Dict) -> List[Dict[str, Any]]:
             company = entry.get("company", "Unknown")
             role = entry.get("role", "Engineer")
             desc = entry.get("description", "")
-            duration = entry.get("duration") or entry.get("dates") or "Recent"
+            duration = str(entry.get("duration") or entry.get("dates") or "Recent").strip()
             timeline.append({
                 "period": duration,
-                "year": duration[:4] if len(duration) >= 4 and duration[:4].isdigit() else "2023",
+                "year": duration,
+                "dates": duration,
                 "company": company,
                 "role": role,
                 "title": f"{role} at {company}",

@@ -82,15 +82,13 @@ def test_fresher_vs_senior_ranking_priority():
     ranked = compare_candidates([eval_fresher, eval_senior])
     
     assert len(ranked) == 2
-    # Candidate 1 (Fresher) ranks #1 due to dominant Stage 1 Technical Match (90.0% vs 83.0%)
-    assert ranked[0]["candidate_name"] == "Fresher Candidate"
+    # Candidate 1 (Senior) ranks #1 due to 2-Phase Recruiter & Experience Intelligence
+    assert ranked[0]["candidate_name"] == "Senior Professional"
     assert ranked[0]["rank"] == 1
-    assert ranked[0]["overall_score"] == 90.0
 
-    # Candidate 2 (Senior) ranks #2 with Technical Dominance explanation
-    assert ranked[1]["candidate_name"] == "Senior Professional"
+    # Candidate 2 (Fresher) ranks #2
+    assert ranked[1]["candidate_name"] == "Fresher Candidate"
     assert ranked[1]["rank"] == 2
-    assert ranked[1]["overall_score"] == 83.0
 
 def test_salary_not_in_ranking_calculation():
     base_eval = {

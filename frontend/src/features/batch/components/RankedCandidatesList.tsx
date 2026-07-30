@@ -12,6 +12,17 @@ interface RankedCandidatesListProps {
 export const RankedCandidatesList: React.FC<RankedCandidatesListProps> = ({ candidates }) => {
   if (candidates.length === 0) return null;
 
+  console.log('[BATCH RANKED LIST TRACE] Rendered Candidate Array:');
+  console.table(
+    candidates.map(c => ({
+      rank: c.rank,
+      name: c.candidate_name,
+      overall_score: c.overall_score,
+      hiring_priority_score: c.hiring_priority_score,
+      tier: c.recommendation_tier || c.hiring_priority_tier
+    }))
+  );
+
   const columns = [
     {
       key: 'rank',
@@ -38,7 +49,7 @@ export const RankedCandidatesList: React.FC<RankedCandidatesListProps> = ({ cand
     },
     {
       key: 'overall_score',
-      header: 'Technical Match',
+      header: 'Overall Recruiter Score',
       render: (c: RankedCandidate) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <span style={{

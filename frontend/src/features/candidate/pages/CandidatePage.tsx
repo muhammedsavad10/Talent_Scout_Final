@@ -159,10 +159,10 @@ export const CandidatePage: React.FC = () => {
 
   // Timeline milestones mapping
   const timelineMilestones = career.map((c: any) => ({
-    year: c.year || '2022',
+    year: c.period || c.dates || c.year || '2022 – Present',
     role: c.role || 'Software Engineer',
     company: c.company || 'Company',
-    details: c.details || 'Professional work history entry.'
+    details: c.details || c.description || 'Professional work history entry.'
   }));
 
   const renderTabContent = () => {
@@ -568,11 +568,30 @@ export const CandidatePage: React.FC = () => {
                   <span>{phone}</span>
                 </div>
               )}
-              {links.map((link: string, idx: number) => (
-                <a key={idx} href={link} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'hsl(var(--primary))', textDecoration: 'none' }}>
-                  <ExternalLink size={14} /> Link {idx + 1}
-                </a>
-              ))}
+              {links
+                .map((rawLink: string) => {
+                  if (!rawLink || typeof rawLink !== 'string') return null;
+                  const trimmed = rawLink.trim();
+                  if (!trimmed) return null;
+                  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+                  try {
+                    const parsed = new URL(href);
+                    const host = parsed.hostname.toLowerCase();
+                    let label = 'Website';
+                    if (host.includes('github.com')) label = 'GitHub';
+                    else if (host.includes('linkedin.com')) label = 'LinkedIn';
+                    else if (host.includes('portfolio') || host.includes('vercel.app') || host.includes('netlify.app')) label = 'Portfolio';
+                    return { href, label };
+                  } catch {
+                    return null;
+                  }
+                })
+                .filter((item: any): item is { href: string; label: string } => item !== null)
+                .map((item: any, idx: number) => (
+                  <a key={idx} href={item.href} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'hsl(var(--primary))', textDecoration: 'none', fontWeight: 500 }}>
+                    <ExternalLink size={14} /> {item.label}
+                  </a>
+                ))}
             </div>
           )}
         </Card>

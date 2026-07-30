@@ -23,35 +23,34 @@ export function useUpload() {
       
       const result = await batchService.submitBatch(formData);
 
-      console.log("========== UPLOAD RESPONSE ==========");
-      console.log(result);
-      console.log("Batch ID:", result?.batch_id);
-      console.log("Status:", result?.status);
-      console.log("====================================");
+      if (import.meta.env.DEV) {
+        console.log("========== UPLOAD RESPONSE ==========");
+        console.log(result);
+        console.log("Batch ID:", result?.batch_id);
+        console.log("Status:", result?.status);
+        console.log("====================================");
+      }
 
       return result;
     },
     onSuccess: (data) => {
-    console.log("===== onSuccess =====");
-    console.log(data);
+      const result = data as { batch_id: string };
 
-    const result = data as { batch_id: string };
+      if (import.meta.env.DEV) {
+        console.log("===== onSuccess =====");
+        console.log(data);
+        console.log("Batch ID:", result.batch_id);
+        console.log("Navigating to:", ROUTES.BATCH.replace(':id', result.batch_id));
+      }
 
-    console.log("Batch ID:", result.batch_id);
-
-    setLastBatchId(result.batch_id);
-
-   console.log("Navigating to:",
-    ROUTES.BATCH.replace(':id', result.batch_id)
-  );
-
-  navigate(ROUTES.BATCH.replace(':id', result.batch_id));
-
-  console.log("Navigation called");
-},
+      setLastBatchId(result.batch_id);
+      navigate(ROUTES.BATCH.replace(':id', result.batch_id));
+    },
     onError: (err) => {
-  console.error("UPLOAD ERROR:", err);
-},
+      if (import.meta.env.DEV) {
+        console.error("UPLOAD ERROR:", err);
+      }
+    },
   });
 }
 export default useUpload;

@@ -228,8 +228,23 @@ def validate_final_api_response(response: Dict[str, Any]) -> Dict[str, Any]:
     if hp_data and isinstance(hp_data, dict):
         hp_complexity = float(hp_data.get("project_complexity", 0.0))
         hp_confidence = float(hp_data.get("evidence_confidence", 0.95))
+        canonical_score = int(hp_data.get("hiring_priority_score") or response.get("hiring_priority_score") or response.get("overall_score") or 0)
+        
         response["project_complexity"] = hp_complexity
         response["evidence_confidence"] = hp_confidence
+        
+        if canonical_score > 0:
+            response["overall_score"] = canonical_score
+            response["hiring_priority_score"] = canonical_score
+            response["recruiter_score"] = canonical_score
+            
+            for target_dict in [eval_data, inner_eval]:
+                if isinstance(target_dict, dict):
+                    target_dict["overall_score"] = canonical_score
+                    target_dict["hiring_priority_score"] = canonical_score
+                    target_dict["recruiter_score"] = canonical_score
+                    if "decision_engine" in target_dict and isinstance(target_dict["decision_engine"], dict):
+                        target_dict["decision_engine"]["overall_score"] = canonical_score
 
     # 4. v1.7.0 Runtime Integrity Assertions (Fail-Fast Verification)
     check_work = eval_data.get("work_history", [])

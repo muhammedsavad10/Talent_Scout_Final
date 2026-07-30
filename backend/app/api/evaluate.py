@@ -49,6 +49,13 @@ async def evaluate_candidate(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
         
+        # Pre-parsing Resume Document Validation Gate
+        from app.core.resume_validator import validate_is_resume
+        is_resume, conf_score, val_msg = validate_is_resume(text)
+        if not is_resume:
+            logger.warning(f"Resume validation gate rejected {file.filename} (Score: {conf_score:.1f}): {val_msg}")
+            raise HTTPException(status_code=400, detail=val_msg)
+        
         # Parse the comma-separated target skills into a clean list
         skills_list = [skill.strip() for skill in jd_skills.split(",") if skill.strip()]
         
@@ -105,10 +112,66 @@ async def get_evaluation_status(evaluation_id: str):
 
 @router.post("/email/generate")
 async def generate_email(payload: dict):
-    return {
-        "subject": "Interview Invitation",
-        "body": "Dear Candidate,\n\nWe are pleased to invite you to an interview based on your excellent resume.\n\nBest regards,\nRecruiter"
+    evaluation_id = payload.get("evaluation_id") or payload.get("id", "")
+    template_type = payload.get("template_type") or payload.get("template", "interview_invitation")
+    
+    cand_name = "Candidate"
+    cand_role = "Senior Engineer"
+    cand_company = "Tech"
+    cand_skills = "Python, FastAPI"
+    
+    if evaluation_id:
+        eval_data = await evaluation_store.get_evaluation(evaluation_id)
+        if eval_data and isinstance(eval_data, dict):
+            res = eval_data.get("result", eval_data)
+            info = res.get("personal_info", {}) if isinstance(res, dict) else {}
+            if isinstance(info, dict) and info.get("name"):
+                cand_name = info["name"]
+            work = res.get("work_history", []) if isinstance(res, dict) else []
+            if work and isinstance(work, list) and isinstance(work[0], dict):
+                cand_company = work[0].get("company", cand_company)
+                cand_role = work[0].get("role", cand_role)
+            skills = res.get("hard_skills") or res.get("skills") or []
+            if skills and isinstance(skills, list):
+                cand_skills = ", ".join([str(s) for s in skills[:4]])
+
+    templates = {
+        "interview_invitation": {
+            "subject": f"TalentScout Enterprise — Technical Interview Invitation for {cand_name}",
+            "body": f"Dear {cand_name},\n\nThank you for applying for the {cand_role} position. Based on your impressive background in {cand_skills} and your achievements at {cand_company}, we would like to invite you for a technical interview.\n\nPlease let us know your availability over the next few business days so we can schedule the discussion.\n\nBest regards,\nTalentScout Recruitment Team"
+        },
+        "technical_assessment": {
+            "subject": f"Technical Assessment Invitation: {cand_role} Position — {cand_name}",
+            "body": f"Dear {cand_name},\n\nFollowing our review of your background in {cand_skills}, we are excited to advance your application for the {cand_role} position.\n\nThe next step is a practical technical assessment designed to demonstrate your hands-on engineering capabilities. The assignment will take approximately 60-90 minutes.\n\nPlease reply to confirm when you are ready to begin the assessment window.\n\nBest regards,\nTalentScout Engineering Team"
+        },
+        "hr_screening": {
+            "subject": f"Initial HR Screening Call — TalentScout Enterprise ({cand_name})",
+            "body": f"Dear {cand_name},\n\nYour profile for the {cand_role} position stood out to our hiring team, particularly your expertise in {cand_skills}.\n\nWe would love to schedule a brief 15-20 minute initial screening call to discuss your career background at {cand_company}, your compensation expectations, and upcoming opportunities.\n\nPlease share 2-3 time slots that work best for you this week.\n\nWarm regards,\nTalentScout Talent Acquisition"
+        },
+        "shortlisted_candidate": {
+            "subject": f"Update on Your Application: Shortlisted for {cand_role}",
+            "body": f"Dear {cand_name},\n\nWe are pleased to inform you that your profile has been officially shortlisted for the {cand_role} position.\n\nOur leadership team was highly impressed by your production experience with {cand_skills}. We are currently finalizing the panel interview schedule and will reach out with calendar invites shortly.\n\nThank you for your continued interest in TalentScout Enterprise.\n\nBest regards,\nTalentScout Executive Search"
+        },
+        "offer_letter": {
+            "subject": f"Formal Employment Offer — {cand_role} at TalentScout Enterprise",
+            "body": f"Dear {cand_name},\n\nOn behalf of TalentScout Enterprise, we are thrilled to offer you the position of {cand_role}.\n\nWe were immensely impressed by your technical precision in {cand_skills} and the leadership demonstrated throughout your career. We believe your contributions will be pivotal to our engineering division.\n\nAttached is the formal offer letter outlining compensation and start dates. Please review and return a signed copy by the indicated deadline.\n\nWelcome to the team!\n\nBest regards,\nTalentScout People Operations"
+        },
+        "hold_future": {
+            "subject": f"TalentScout Enterprise — Application Status Update ({cand_role})",
+            "body": f"Dear {cand_name},\n\nThank you for giving us the opportunity to consider your background for the {cand_role} position.\n\nWhile we have decided to move forward with another candidate whose immediate domain focus matched our present sprint, your strong profile in {cand_skills} left a lasting impression on our team.\n\nWith your permission, we will keep your profile active in our Talent Vault and reach out immediately when matching roles open.\n\nSincerely,\nTalentScout Talent Acquisition"
+        },
+        "rejection_email": {
+            "subject": f"Application Status for {cand_role} — TalentScout Enterprise",
+            "body": f"Dear {cand_name},\n\nThank you for taking the time to apply for the {cand_role} role and sharing your experience at {cand_company}.\n\nAfter careful consideration of all applicants, we have chosen to proceed with candidates whose current project scope aligns more closely with our active requirements.\n\nWe appreciate your interest in TalentScout Enterprise and wish you continued success in your professional endeavors.\n\nSincerely,\nTalentScout Recruitment Team"
+        },
+        "follow_up_reminder": {
+            "subject": f"Follow-up Regarding Your {cand_role} Application — TalentScout Enterprise",
+            "body": f"Dear {cand_name},\n\nI hope this email finds you well.\n\nI am following up on our previous communication regarding the {cand_role} position. We remain very interested in your experience with {cand_skills} and would love to hear your thoughts on proceeding with the next steps.\n\nPlease let us know if you are still available for a brief conversation.\n\nBest regards,\nTalentScout Recruitment Team"
+        }
     }
+    
+    selected = templates.get(template_type, templates["interview_invitation"])
+    return selected
 
 def normalize_skill(skill: str) -> str:
     if not isinstance(skill, str):

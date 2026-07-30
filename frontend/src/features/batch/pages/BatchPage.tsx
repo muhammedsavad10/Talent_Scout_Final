@@ -84,10 +84,7 @@ export const BatchPage: React.FC = () => {
         )}
 
         {data && (
-          <>console.log("===== BATCH DATA =====");
-            console.log(data);
-            console.log("STATUS =", data?.status);
-            console.log("======================");
+          <>
             <BatchStatusCard batch={data} />
             
             {/* Show rankings if completed */}

@@ -20,9 +20,11 @@ export const evaluationService = {
     return res.data;
   },
 
-  generateEmail: async (candidateId: string): Promise<EmailGenerateResponse> => {
+  generateEmail: async (candidateId: string, templateType: string = 'interview_invitation'): Promise<EmailGenerateResponse> => {
     const res = await apiClient.post<EmailGenerateResponse>('/evaluation/email/generate', {
       candidate_id: candidateId,
+      evaluation_id: candidateId,
+      template_type: templateType,
     });
     return res.data;
   },

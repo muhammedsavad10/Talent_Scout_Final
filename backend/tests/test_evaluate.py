@@ -8,8 +8,9 @@ from main import app
 client = TestClient(app)
 
 def test_evaluate_endpoint_success(mocker):
-    # Mock PDF extraction
-    mocker.patch("app.api.evaluate.extract_text_from_pdf", return_value="dummy text")
+    # Mock PDF extraction with valid resume text
+    mock_resume = "John Doe\nEmail: john@example.com\nExperience: Software Engineer at TechCorp\nEducation: BS CS\nSkills: Python, Docker"
+    mocker.patch("app.api.evaluate.extract_text_from_pdf", return_value=mock_resume)
     
     # Mock the internal orchestrator execution call completely
     mock_final_state = {

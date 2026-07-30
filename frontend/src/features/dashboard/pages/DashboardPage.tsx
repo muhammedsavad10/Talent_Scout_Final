@@ -68,6 +68,19 @@ export const DashboardPage: React.FC = () => {
       return 0;
     });
 
+    if (result.length > 0) {
+      console.log('[DASHBOARD RENDER TRACE] Rendered Candidate Array:');
+      console.table(
+        result.map(c => ({
+          rank: c.rank,
+          name: c.candidate_name,
+          overall_score: c.overall_score,
+          hiring_priority_score: c.hiring_priority_score,
+          tier: c.recommendation_tier || c.hiring_priority_tier
+        }))
+      );
+    }
+
     return result;
   }, [candidates, searchTerm, tierFilter, policyFilter, sortKey, sortOrder]);
 
@@ -76,7 +89,7 @@ export const DashboardPage: React.FC = () => {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortOrder('asc');
+      setSortOrder(key === 'overall_score' ? 'desc' : 'asc');
     }
   };
 

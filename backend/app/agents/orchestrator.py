@@ -444,17 +444,25 @@ async def run_evaluation_pipeline(
         if evaluation_data.get("status") == "error":
             return evaluation_data
 
-        # Stage 2: Recruiter Intelligence Engine (Explanatory layer, consumes Stage 1 as read-only)
+        # Stage 2: Recruiter Intelligence Engine (Synthesizes Phase 1 Technical Screening + Phase 2 Career Intelligence)
         intelligence_data = run_stage2_intelligence(evaluation_data)
 
         hp_data = evaluation_data.get("hiring_priority", {})
+        canonical_final_score = int(hp_data.get("hiring_priority_score") or evaluation_data.get("overall_score") or 0)
+        phase1_technical_score = float(evaluation_data.get("overall_score") or 0.0)
 
-        # Build response with strict Stage 1 ("evaluation") and Stage 2 ("recruiter_intelligence") separation
+        # Build response with Unified Two-Phase Recruiter Final Score
         result = {
             "evaluation": evaluation_data,
             "recruiter_intelligence": intelligence_data,
             
-            # Root-level property aliases for complete backward compatibility
+            # Root-level canonical score definitions
+            "overall_score": canonical_final_score,
+            "hiring_priority_score": canonical_final_score,
+            "recruiter_score": canonical_final_score,
+            "stage1_match_score": phase1_technical_score,
+            "technical_score": phase1_technical_score,
+
             "evaluation_id": evaluation_data.get("evaluation_id"),
             "status": evaluation_data.get("status"),
             "candidate_facts": evaluation_data.get("candidate_facts"),
@@ -463,9 +471,7 @@ async def run_evaluation_pipeline(
             "matched_skills": evaluation_data.get("matched_skills"),
             "inferred_skills": evaluation_data.get("inferred_skills"),
             "missing_skills": evaluation_data.get("missing_skills"),
-            "overall_score": evaluation_data.get("overall_score"),
             "hiring_priority": hp_data,
-            "hiring_priority_score": hp_data.get("hiring_priority_score"),
             "evidence_confidence": hp_data.get("evidence_confidence", 0.95),
             "project_complexity": hp_data.get("project_complexity", 0.0),
             "professional_profile": hp_data.get("professional_profile", {}),
@@ -477,7 +483,8 @@ async def run_evaluation_pipeline(
             "parsed_resume": evaluation_data.get("parsed_resume", {}),
             "raw_resume_text": evaluation_data.get("raw_resume_text", ""),
             "decision_engine": {
-                "overall_score": evaluation_data.get("overall_score"),
+                "overall_score": canonical_final_score,
+                "stage1_match_score": phase1_technical_score,
                 "policy_eligible": evaluation_data.get("policy_validation", {}).get("policy_eligible", True),
                 "evidence_states": evaluation_data.get("evidence_states", {}),
                 "dimension_scores": evaluation_data.get("dimension_scores", {}),
