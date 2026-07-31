@@ -646,9 +646,10 @@ def score_seniority_level(prof_exp: list) -> Tuple[float, str]:
 
     highest_title = roles[0]
     exec_terms = ["director", "vp", "head of", "chief", "cto"]
-    staff_terms = ["staff", "principal", "architect", "data scientist l1", "data scientist"]
-    senior_terms = ["senior", "lead", "sr.", "manager", "ai developer", "machine learning engineer"]
-    mid_terms = ["engineer", "developer", "analyst", "consultant"]
+    staff_terms = ["staff", "principal", "architect"]
+    senior_terms = ["senior", "lead", "sr.", "manager"]
+    mid_terms = ["engineer", "developer", "analyst", "consultant", "data scientist", "specialist"]
+    entry_terms = ["junior", "associate", "intern", "trainee", "assistant"]
 
     highest_pts = 0.0
     for r in roles:
@@ -659,7 +660,7 @@ def score_seniority_level(prof_exp: list) -> Tuple[float, str]:
             pts = 13.5
         elif any(t in rl for t in senior_terms):
             pts = 11.0
-        elif any(t in rl for t in mid_terms):
+        elif any(t in rl for t in mid_terms) and not any(e in rl for e in entry_terms):
             pts = 7.5
         else:
             pts = 4.0
@@ -916,6 +917,16 @@ def compute_hiring_priority_score(
         "certifications": {"points": cert_pts, "reason": cert_reason}
     }
 
+    # Holistic Seniority Level Derivation: combines verified experience duration, role progression, and title signals
+    if total_prof_years >= 5.0 or (seniority_pts >= 11.0 and total_prof_years >= 3.0):
+        seniority_level_str = "Senior / Lead"
+    elif total_prof_years >= 2.0 or seniority_pts >= 7.5 or len(prof_exp) >= 2:
+        seniority_level_str = "Mid-Level"
+    elif len(prof_exp) >= 1 or total_prof_years >= 0.5:
+        seniority_level_str = "Junior / Associate"
+    else:
+        seniority_level_str = "Entry-Level"
+
     professional_profile = {
         "candidate_name": candidate_name,
         "professional_experience_count": exp_metrics["professional_experience_count"],
@@ -926,6 +937,9 @@ def compute_hiring_priority_score(
         "current_role": current_role,
         "current_company": current_company,
         "total_professional_years": total_prof_years,
+        "years_experience": total_prof_years,
+        "total_years_experience": total_prof_years,
+        "seniority_level": seniority_level_str,
         "evidence_confidence": canonical.evidence_confidence,
         "project_complexity": canonical.project_complexity
     }

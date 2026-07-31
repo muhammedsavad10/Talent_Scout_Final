@@ -135,8 +135,17 @@ export const CandidatePage: React.FC = () => {
   // Candidate-Specific Recruiter Evidence Signals (Ground Truth Data Extraction)
   const priorityFactors = hiringPriority.priority_factors || {};
   const profProfile = hiringPriority.professional_profile || {};
-  const totalYearsExp = profProfile.years_experience ?? (result as any).evidence?.years_of_experience ?? (candidateFacts as any).years_experience ?? 0;
-  const seniorityLevel = profProfile.seniority_level || (totalYearsExp >= 5 ? 'Senior / Lead' : totalYearsExp >= 2 ? 'Mid-Level' : 'Entry-Level');
+  const totalYearsExp = profProfile.total_professional_years 
+    ?? profProfile.years_experience 
+    ?? profProfile.total_years_experience 
+    ?? (result as any).evidence?.years_of_experience 
+    ?? (candidateFacts as any).years_experience 
+    ?? 0;
+  const profExpCount = profProfile.professional_experience_count ?? (career.length || 0);
+  const seniorityLevel = profProfile.seniority_level || (
+    totalYearsExp >= 3 || profExpCount >= 2 ? 'Senior / Lead' :
+    totalYearsExp >= 1 || profExpCount >= 1 ? 'Mid-Level' : 'Entry-Level'
+  );
   const prodIndicators = hiringPriority.production_indicators || (result as any).evidence?.production_engineering || [];
   const projectComplexityScore = hiringPriority.project_complexity ?? 0;
   const certsList = hiringPriority.certifications || (result as any).certifications || (result as any).evidence?.certifications || [];
@@ -464,14 +473,23 @@ export const CandidatePage: React.FC = () => {
 
       case 'breakdown':
         {
-          const candidateRank = (result as any).rank ?? (result as any).candidate_rank ?? 1;
+          const rawRank = (result as any).rank ?? (result as any).candidate_rank;
+          const hasRankContext = typeof rawRank === 'number' && rawRank > 0;
+          const rankLabel = hasRankContext ? `Ranked #${rawRank}` : 'Standalone Evaluation';
+
           const confidenceLevel = (result as any).recommendation?.confidence || (result as any).confidence || 'Very High';
           const confidenceReasoning = (result as any).recommendation?.confidence_reasoning || 'Based on deterministic evidence coverage, resume completeness, and semantic alignment.';
 
           const dynamicRationaleParts = [];
-          dynamicRationaleParts.push(`Ranked #${candidateRank} for ${targetRole}`);
+          if (hasRankContext) {
+            dynamicRationaleParts.push(`Ranked #${rawRank} for ${targetRole}`);
+          } else {
+            dynamicRationaleParts.push(`Evaluated for ${targetRole}`);
+          }
           dynamicRationaleParts.push(`demonstrating ${stage1MatchScore}% Stage 1 Technical Match`);
-          if (totalYearsExp > 0) dynamicRationaleParts.push(`supported by ${totalYearsExp.toFixed(1)} years verified industry experience`);
+          if (totalYearsExp > 0 || profExpCount > 0) {
+            dynamicRationaleParts.push(`supported by ${totalYearsExp > 0 ? `${totalYearsExp.toFixed(1)} years` : `${profExpCount} positions`} verified industry experience`);
+          }
           if (seniorityLevel) dynamicRationaleParts.push(`${seniorityLevel} career progression`);
           if (prodIndicators.length > 0) dynamicRationaleParts.push(`and ${prodIndicators.length} production engineering indicators (${prodIndicators.slice(0, 3).join(', ')})`);
 
@@ -533,7 +551,7 @@ export const CandidatePage: React.FC = () => {
                       {overallScore}%
                     </span>
                     <span style={{ fontSize: '10px', fontWeight: 700, color: 'hsl(var(--success))' }}>
-                      Ranked #{candidateRank}
+                      {rankLabel}
                     </span>
                   </div>
 
@@ -582,13 +600,17 @@ export const CandidatePage: React.FC = () => {
                       Primary Decision Signals
                     </span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-                      {totalYearsExp > 0 ? (
-                        <span style={{ color: 'hsl(var(--success))', fontWeight: 600 }}>✔ Verified {totalYearsExp.toFixed(1)} years industry employment</span>
+                      {totalYearsExp > 0 || profExpCount > 0 ? (
+                        <span style={{ color: 'hsl(var(--success))', fontWeight: 600 }}>
+                          ✔ Verified {totalYearsExp > 0 ? `${totalYearsExp.toFixed(1)} years` : `${profExpCount} positions`} industry employment
+                        </span>
                       ) : (
-                        <span style={{ color: 'hsl(var(--destructive))', fontWeight: 500 }}>✖ No verified industry employment history</span>
+                        <span style={{ color: 'hsl(var(--destructive))', fontWeight: 500 }}>
+                          ✖ No verified industry employment history
+                        </span>
                       )}
 
-                      {seniorityPts > 0 ? (
+                      {seniorityPts > 0 || seniorityLevel !== 'Entry-Level' ? (
                         <span style={{ color: 'hsl(var(--success))', fontWeight: 600 }}>✔ {seniorityLevel} career alignment</span>
                       ) : (
                         <span style={{ color: 'hsl(var(--muted-foreground))' }}>⚠ Entry-level career profile</span>
@@ -611,7 +633,7 @@ export const CandidatePage: React.FC = () => {
                       {overallScore}%
                     </span>
                     <span style={{ fontSize: '11px', fontWeight: 600, color: '#a78bfa' }}>
-                      Ranked #{candidateRank} ({hiringPriorityTier})
+                      {hasRankContext ? `Ranked #${rawRank} (${hiringPriorityTier})` : hiringPriorityTier}
                     </span>
                   </div>
                 </div>
@@ -633,9 +655,9 @@ export const CandidatePage: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Industry Experience</span>
-                        {totalYearsExp > 0 ? (
+                        {totalYearsExp > 0 || profExpCount > 0 ? (
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'hsl(var(--success))', background: 'hsla(var(--success), 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
-                            ✔ {totalYearsExp.toFixed(1)} yrs
+                            ✔ {totalYearsExp > 0 ? `${totalYearsExp.toFixed(1)} yrs` : `${profExpCount} Positions`}
                           </span>
                         ) : (
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'hsl(var(--destructive))', background: 'hsla(var(--destructive), 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
